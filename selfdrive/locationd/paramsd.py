@@ -14,7 +14,7 @@ from openpilot.selfdrive.locationd.models.car_kf import CarKalman, ObservationKi
 from openpilot.selfdrive.locationd.models.constants import GENERATED_DIR
 from openpilot.common.swaglog import cloudlog
 
-from openpilot.selfdrive.frogpilot.frogpilot_variables import params_memory
+from openpilot.selfdrive.frogpilot.frogpilot_variables import get_frogpilot_toggles, params_memory
 
 MAX_ANGLE_OFFSET_DELTA = 20 * DT_MDL  # Max 20 deg/s
 ROLL_MAX_DELTA = math.radians(20.0) * DT_MDL  # 20deg in 1 second is well within curvature limits
@@ -126,7 +126,7 @@ def main():
   REPLAY = bool(int(os.getenv("REPLAY", "0")))
 
   pm = messaging.PubMaster(['liveParameters'])
-  sm = messaging.SubMaster(['liveLocationKalman', 'carState'], poll='liveLocationKalman')
+  sm = messaging.SubMaster(['liveLocationKalman', 'carState', 'frogpilotPlan'], poll='liveLocationKalman')
 
   params_reader = Params()
   # wait for stats about the car to come in from controls
@@ -184,6 +184,9 @@ def main():
   total_offset_valid = True
   roll_valid = True
 
+  # FrogPilot variables
+  frogpilot_toggles = get_frogpilot_toggles()
+
   while True:
     sm.update()
     if sm.all_checks():
@@ -227,7 +230,7 @@ def main():
       liveParameters = msg.liveParameters
       liveParameters.posenetValid = True
       liveParameters.sensorValid = sensors_valid
-      liveParameters.steerRatio = float(x[States.STEER_RATIO].item())
+      liveParameters.steerRatio = float(x[States.STEER_RATIO].item() if not frogpilot_toggles.use_custom_steer_ratio else frogpilot_toggles.steer_ratio)
       liveParameters.stiffnessFactor = float(x[States.STIFFNESS].item())
       liveParameters.roll = roll
       liveParameters.angleOffsetAverageDeg = angle_offset_average
@@ -265,6 +268,9 @@ def main():
 
       pm.send('liveParameters', msg)
 
+    # Update FrogPilot parameters
+    if sm['frogpilotPlan'].togglesUpdated:
+      frogpilot_toggles = get_frogpilot_toggles()
 
 if __name__ == "__main__":
   main()

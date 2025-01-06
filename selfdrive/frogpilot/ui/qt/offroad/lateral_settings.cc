@@ -1,6 +1,12 @@
 #include "selfdrive/frogpilot/ui/qt/offroad/lateral_settings.h"
 
-FrogPilotLateralPanel::FrogPilotLateralPanel(FrogPilotSettingsWindow *parent) : FrogPilotListWidget(parent), parent(parent) {
+FrogPilotLateralPanel::FrogPilotLateralPanel(FrogPilotSettingsWindow *parent) : QWidget(parent), parent(parent) {
+  QVBoxLayout *lateralLayout = new QVBoxLayout(this);
+  lateralLayout->setContentsMargins(50, 25, 50, 25);
+
+  FrogPilotListWidget *list = new FrogPilotListWidget(this);
+  lateralLayout->addWidget(list);
+
   const std::vector<std::tuple<QString, QString, QString, QString>> lateralToggles {
     {"AdvancedLateralTune", tr("Advanced Lateral Tuning"), tr("Advanced settings for fine tuning openpilot's lateral controls."), "../frogpilot/assets/toggle_icons/icon_advanced_lateral_tune.png"},
     {"SteerFriction", steerFrictionStock != 0 ? QString(tr("Friction (Default: %1)")).arg(QString::number(steerFrictionStock, 'f', 2)) : tr("Friction"), tr("Adjusts the resistance in steering. Higher values provide more stable steering but can make it feel heavy, while lower values allow lighter steering but may feel too sensitive."), ""},
@@ -63,6 +69,19 @@ FrogPilotLateralPanel::FrogPilotLateralPanel(FrogPilotSettingsWindow *parent) : 
         if (!liveValid || usingNNFF) {
           modifiedAdvancedLateralTuneKeys.erase("SteerFriction");
           modifiedAdvancedLateralTuneKeys.erase("SteerLatAccel");
+        }
+
+        if (params.getFloat("SteerFrictionStock") == 0) {
+          modifiedAdvancedLateralTuneKeys.erase("SteerFriction");
+        }
+        if (params.getFloat("SteerKPStock") == 0) {
+          modifiedAdvancedLateralTuneKeys.erase("SteerKP");
+        }
+        if (params.getFloat("SteerLatAccelStock") == 0) {
+          modifiedAdvancedLateralTuneKeys.erase("SteerLatAccel");
+        }
+        if (params.getFloat("SteerRatioStock") == 0) {
+          modifiedAdvancedLateralTuneKeys.erase("SteerRatio");
         }
 
         showToggles(modifiedAdvancedLateralTuneKeys);
@@ -142,7 +161,7 @@ FrogPilotLateralPanel::FrogPilotLateralPanel(FrogPilotSettingsWindow *parent) : 
       lateralToggle = new ParamControl(param, title, desc, icon);
     }
 
-    addItem(lateralToggle);
+    list->addItem(lateralToggle);
     toggles[param] = lateralToggle;
 
     if (FrogPilotParamManageControl *frogPilotManageToggle = qobject_cast<FrogPilotParamManageControl*>(lateralToggle)) {

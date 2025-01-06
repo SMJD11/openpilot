@@ -100,7 +100,13 @@ QString storeThemeName(const QString &input, const std::string &paramKey, Params
   return getThemeName(paramKey, params);
 }
 
-FrogPilotThemesPanel::FrogPilotThemesPanel(FrogPilotSettingsWindow *parent) : FrogPilotListWidget(parent), parent(parent) {
+FrogPilotThemesPanel::FrogPilotThemesPanel(FrogPilotSettingsWindow *parent) : QWidget(parent), parent(parent) {
+  QVBoxLayout *themeLayout = new QVBoxLayout(this);
+  themeLayout->setContentsMargins(50, 25, 50, 25);
+
+  FrogPilotListWidget *list = new FrogPilotListWidget(this);
+  themeLayout->addWidget(list);
+
   const std::vector<std::tuple<QString, QString, QString, QString>> themeToggles {
     {"PersonalizeOpenpilot", tr("Custom Theme"), tr("Custom openpilot themes."), "../frogpilot/assets/toggle_icons/frog.png"},
     {"CustomColors", tr("Color Scheme"), tr("Changes out openpilot's color scheme.\n\nWant to submit your own color scheme? Share it in the 'custom-themes' channel on the FrogPilot Discord!"), ""},
@@ -480,7 +486,7 @@ FrogPilotThemesPanel::FrogPilotThemesPanel(FrogPilotSettingsWindow *parent) : Fr
       themeToggle = new ParamControl(param, title, desc, icon);
     }
 
-    addItem(themeToggle);
+    list->addItem(themeToggle);
     toggles[param] = themeToggle;
 
     if (FrogPilotParamManageControl *frogPilotManageToggle = qobject_cast<FrogPilotParamManageControl*>(themeToggle)) {
@@ -588,6 +594,8 @@ void FrogPilotThemesPanel::updateState(const UIState &s) {
   manageWheelIconsBtn->setEnabledButtons(0, !themeDownloading);
   manageWheelIconsBtn->setEnabledButtons(1, s.scene.online && (!themeDownloading || wheelDownloading) && !cancellingDownload && !wheelsDownloaded && parked);
   manageWheelIconsBtn->setEnabledButtons(2, !themeDownloading);
+
+  parent->keepScreenOn = themeDownloading;
 }
 
 void FrogPilotThemesPanel::showToggles(const std::set<QString> &keys) {

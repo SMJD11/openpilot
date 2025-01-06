@@ -4,14 +4,20 @@
 
 #include "selfdrive/frogpilot/navigation/ui/maps_settings.h"
 
-FrogPilotMapsPanel::FrogPilotMapsPanel(FrogPilotSettingsWindow *parent) : FrogPilotListWidget(parent) {
+FrogPilotMapsPanel::FrogPilotMapsPanel(FrogPilotSettingsWindow *parent) : QWidget(parent), parent(parent) {
+  QVBoxLayout *mapDataLayout = new QVBoxLayout(this);
+  mapDataLayout->setContentsMargins(50, 25, 50, 25);
+
+  FrogPilotListWidget *list = new FrogPilotListWidget(this);
+  mapDataLayout->addWidget(list);
+
   std::vector<QString> scheduleOptions{tr("Manually"), tr("Weekly"), tr("Monthly")};
   preferredSchedule = new ButtonParamControl("PreferredSchedule", tr("Automatically Update Maps"),
                                           tr("Controls the frequency at which maps update with the latest OpenStreetMap (OSM) changes. "
                                              "Weekly updates begin at midnight every Sunday, while monthly updates start at midnight on the 1st of each month."),
                                              "",
                                              scheduleOptions);
-  addItem(preferredSchedule);
+  list->addItem(preferredSchedule);
 
   selectMapsButton = new FrogPilotButtonsControl(tr("Select Map Data Sources"), tr("Map data sources to use with 'Curve Speed Control' and 'Speed Limit Controller'."), {tr("COUNTRIES"), tr("STATES")});
   QObject::connect(selectMapsButton, &FrogPilotButtonsControl::buttonClicked, [this](int id) {
@@ -21,7 +27,7 @@ FrogPilotMapsPanel::FrogPilotMapsPanel(FrogPilotSettingsWindow *parent) : FrogPi
     displayMapButtons();
     openMapSelection();
   });
-  addItem(selectMapsButton);
+  list->addItem(selectMapsButton);
 
   downloadMapsButton = new ButtonControl(tr("Download Maps"), tr("DOWNLOAD"), tr("Downloads the selected maps to use with 'Curve Speed Control' and 'Speed Limit Controller'."));
   QObject::connect(downloadMapsButton, &ButtonControl::clicked, [this] {
@@ -31,13 +37,13 @@ FrogPilotMapsPanel::FrogPilotMapsPanel(FrogPilotSettingsWindow *parent) : FrogPi
       downloadMaps();
     }
   });
-  addItem(downloadMapsButton);
+  list->addItem(downloadMapsButton);
 
-  addItem(mapsSize = new LabelControl(tr("Downloaded Maps Size"), calculateDirectorySize(mapsFolderPath)));
-  addItem(downloadStatus = new LabelControl(tr("Download Progress")));
-  addItem(downloadETA = new LabelControl(tr("Download Completion ETA")));
-  addItem(downloadTimeElapsed = new LabelControl(tr("Download Time Elapsed")));
-  addItem(lastMapsDownload = new LabelControl(tr("Maps Last Updated"), params.get("LastMapsUpdate").empty() ? "Never" : QString::fromStdString(params.get("LastMapsUpdate"))));
+  list->addItem(mapsSize = new LabelControl(tr("Downloaded Maps Size"), calculateDirectorySize(mapsFolderPath)));
+  list->addItem(downloadStatus = new LabelControl(tr("Download Progress")));
+  list->addItem(downloadETA = new LabelControl(tr("Download Completion ETA")));
+  list->addItem(downloadTimeElapsed = new LabelControl(tr("Download Time Elapsed")));
+  list->addItem(lastMapsDownload = new LabelControl(tr("Maps Last Updated"), params.get("LastMapsUpdate").empty() ? "Never" : QString::fromStdString(params.get("LastMapsUpdate"))));
 
   downloadETA->setVisible(false);
   downloadStatus->setVisible(false);
@@ -53,44 +59,44 @@ FrogPilotMapsPanel::FrogPilotMapsPanel(FrogPilotSettingsWindow *parent) : FrogPi
       }).detach();
     }
   });
-  addItem(removeMapsButton);
+  list->addItem(removeMapsButton);
   removeMapsButton->setVisible(QDir(mapsFolderPath).exists());
 
-  addItem(midwestLabel = new LabelControl(tr("United States - Midwest"), ""));
-  addItem(midwestMaps = new MapSelectionControl(midwestMap));
+  list->addItem(midwestLabel = new LabelControl(tr("United States - Midwest"), ""));
+  list->addItem(midwestMaps = new MapSelectionControl(midwestMap));
 
-  addItem(northeastLabel = new LabelControl(tr("United States - Northeast"), ""));
-  addItem(northeastMaps = new MapSelectionControl(northeastMap));
+  list->addItem(northeastLabel = new LabelControl(tr("United States - Northeast"), ""));
+  list->addItem(northeastMaps = new MapSelectionControl(northeastMap));
 
-  addItem(southLabel = new LabelControl(tr("United States - South"), ""));
-  addItem(southMaps = new MapSelectionControl(southMap));
+  list->addItem(southLabel = new LabelControl(tr("United States - South"), ""));
+  list->addItem(southMaps = new MapSelectionControl(southMap));
 
-  addItem(westLabel = new LabelControl(tr("United States - West"), ""));
-  addItem(westMaps = new MapSelectionControl(westMap));
+  list->addItem(westLabel = new LabelControl(tr("United States - West"), ""));
+  list->addItem(westMaps = new MapSelectionControl(westMap));
 
-  addItem(territoriesLabel = new LabelControl(tr("United States - Territories"), ""));
-  addItem(territoriesMaps = new MapSelectionControl(territoriesMap));
+  list->addItem(territoriesLabel = new LabelControl(tr("United States - Territories"), ""));
+  list->addItem(territoriesMaps = new MapSelectionControl(territoriesMap));
 
-  addItem(africaLabel = new LabelControl(tr("Africa"), ""));
-  addItem(africaMaps = new MapSelectionControl(africaMap, true));
+  list->addItem(africaLabel = new LabelControl(tr("Africa"), ""));
+  list->addItem(africaMaps = new MapSelectionControl(africaMap, true));
 
-  addItem(antarcticaLabel = new LabelControl(tr("Antarctica"), ""));
-  addItem(antarcticaMaps = new MapSelectionControl(antarcticaMap, true));
+  list->addItem(antarcticaLabel = new LabelControl(tr("Antarctica"), ""));
+  list->addItem(antarcticaMaps = new MapSelectionControl(antarcticaMap, true));
 
-  addItem(asiaLabel = new LabelControl(tr("Asia"), ""));
-  addItem(asiaMaps = new MapSelectionControl(asiaMap, true));
+  list->addItem(asiaLabel = new LabelControl(tr("Asia"), ""));
+  list->addItem(asiaMaps = new MapSelectionControl(asiaMap, true));
 
-  addItem(europeLabel = new LabelControl(tr("Europe"), ""));
-  addItem(europeMaps = new MapSelectionControl(europeMap, true));
+  list->addItem(europeLabel = new LabelControl(tr("Europe"), ""));
+  list->addItem(europeMaps = new MapSelectionControl(europeMap, true));
 
-  addItem(northAmericaLabel = new LabelControl(tr("North America"), ""));
-  addItem(northAmericaMaps = new MapSelectionControl(northAmericaMap, true));
+  list->addItem(northAmericaLabel = new LabelControl(tr("North America"), ""));
+  list->addItem(northAmericaMaps = new MapSelectionControl(northAmericaMap, true));
 
-  addItem(oceaniaLabel = new LabelControl(tr("Oceania"), ""));
-  addItem(oceaniaMaps = new MapSelectionControl(oceaniaMap, true));
+  list->addItem(oceaniaLabel = new LabelControl(tr("Oceania"), ""));
+  list->addItem(oceaniaMaps = new MapSelectionControl(oceaniaMap, true));
 
-  addItem(southAmericaLabel = new LabelControl(tr("South America"), ""));
-  addItem(southAmericaMaps = new MapSelectionControl(southAmericaMap, true));
+  list->addItem(southAmericaLabel = new LabelControl(tr("South America"), ""));
+  list->addItem(southAmericaMaps = new MapSelectionControl(southAmericaMap, true));
 
   QObject::connect(parent, &FrogPilotSettingsWindow::closeMapSelection, [this]() {
     displayMapButtons(false);
@@ -107,9 +113,14 @@ FrogPilotMapsPanel::FrogPilotMapsPanel(FrogPilotSettingsWindow *parent) : FrogPi
 }
 
 void FrogPilotMapsPanel::showEvent(QShowEvent *event) {
+  mapdExists = std::filesystem::exists("/data/media/0/osm/mapd");
   mapsSelected = params.get("MapsSelected");
   hasMapsSelected = !QJsonDocument::fromJson(QByteArray::fromStdString(mapsSelected)).object().value("nations").toArray().isEmpty();
   hasMapsSelected |= !QJsonDocument::fromJson(QByteArray::fromStdString(mapsSelected)).object().value("states").toArray().isEmpty();
+
+  std::thread([this] {
+    mapsSize->setText(calculateDirectorySize(mapsFolderPath));
+  }).detach();
 }
 
 void FrogPilotMapsPanel::hideEvent(QHideEvent *event) {
@@ -123,11 +134,13 @@ void FrogPilotMapsPanel::updateState(const UIState &s) {
     return;
   }
 
-  if (downloadActive) {
+  if (downloadActive && s.sm->frame % (UI_FREQ / 2) == 0) {
     updateDownloadStatusLabels();
   }
 
-  downloadMapsButton->setEnabled(hasMapsSelected && s.scene.online);
+  downloadMapsButton->setEnabled(mapdExists && hasMapsSelected && s.scene.online);
+
+  parent->keepScreenOn = downloadActive;
 }
 
 void FrogPilotMapsPanel::cancelDownload() {

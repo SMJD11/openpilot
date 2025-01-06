@@ -48,17 +48,16 @@ void update_leads(UIState *s, const cereal::RadarState::Reader &radar_state, con
   SubMaster &sm = *(s->sm);
   float path_offset_z = sm["liveCalibration"].getLiveCalibration().getHeight()[0];
 
-  cereal::RadarState::LeadData::Reader (cereal::RadarState::Reader::*get_lead_data[7])() const = {
+  cereal::RadarState::LeadData::Reader (cereal::RadarState::Reader::*get_lead_data[6])() const = {
     &cereal::RadarState::Reader::getLeadOne,
     &cereal::RadarState::Reader::getLeadTwo,
-    &cereal::RadarState::Reader::getLeadFar,
     &cereal::RadarState::Reader::getLeadLeft,
     &cereal::RadarState::Reader::getLeadRight,
     &cereal::RadarState::Reader::getLeadLeftFar,
     &cereal::RadarState::Reader::getLeadRightFar
   };
 
-  for (int i = 0; i < 7; ++i) {
+  for (int i = 0; i < 6; ++i) {
     auto lead_data = (radar_state.*get_lead_data[i])();
     if (lead_data.getStatus()) {
       float z = line.getZ()[get_path_length_idx(line, lead_data.getDRel())];
@@ -309,12 +308,11 @@ static void update_state(UIState *s) {
     scene.upcoming_speed_limit = frogpilotPlan.getUpcomingSLCSpeedLimit();
     scene.vtsc_controlling_curve = frogpilotPlan.getVtscControllingCurve();
     scene.vtsc_speed = frogpilotPlan.getVtscSpeed();
-    if (frogpilotPlan.getTogglesUpdated()) {
+    if (frogpilotPlan.getTogglesUpdated() && sm.frame % UI_FREQ == 0) {
       scene.frogpilot_toggles = QJsonDocument::fromJson(QString::fromStdString(s->params_memory.get("FrogPilotToggles", true)).toUtf8()).object();
+
       ui_update_params(s);
-      if (frogpilotPlan.getThemeUpdated()) {
-        ui_update_theme(s);
-      }
+      ui_update_theme(s);
     }
   }
   if (sm.updated("liveLocationKalman")) {
@@ -452,8 +450,8 @@ void ui_update_frogpilot_params(UIState *s) {
 void ui_update_theme(UIState *s) {
   UIScene &scene = s->scene;
 
-  scene.use_stock_colors = scene.frogpilot_toggles.value("color_scheme").toString() == "stock" && scene.frogpilot_toggles.value("current_holiday_theme").toString() == "stock";
-  scene.use_stock_wheel = scene.frogpilot_toggles.value("wheel_image").toString() == "stock" && scene.frogpilot_toggles.value("current_holiday_theme").toString() == "stock";
+  scene.use_stock_colors = scene.frogpilot_toggles.value("color_scheme").toString() == "stock";
+  scene.use_stock_wheel = scene.frogpilot_toggles.value("wheel_image").toString() == "stock";
 
   if (!scene.use_stock_colors) {
     scene.use_stock_colors |= !loadThemeColors("", true).isValid();

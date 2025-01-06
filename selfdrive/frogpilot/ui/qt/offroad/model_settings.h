@@ -4,7 +4,7 @@
 
 #include "selfdrive/frogpilot/ui/qt/offroad/frogpilot_settings.h"
 
-class FrogPilotModelPanel : public FrogPilotListWidget {
+class FrogPilotModelPanel : public QWidget {
   Q_OBJECT
 
 public:
@@ -21,7 +21,7 @@ private:
   void hideSubToggles();
   void hideToggles();
   void showToggles(const std::set<QString> &keys);
-  void updateModelLabels();
+  void updateModelLabels(FrogPilotListWidget *list);
   void updateState(const UIState &s);
 
   ButtonControl *selectModelBtn;

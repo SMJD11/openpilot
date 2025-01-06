@@ -27,7 +27,7 @@ from openpilot.selfdrive.classic_modeld.models.commonmodel_pyx import ModelFrame
 
 from openpilot.selfdrive.frogpilot.frogpilot_variables import DEFAULT_CLASSIC_MODEL, MODELS_PATH, get_frogpilot_toggles
 
-PROCESS_NAME = "selfdrive.classic_modeld.modeld"
+PROCESS_NAME = "selfdrive.classic_modeld.classic_modeld"
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
 
 MODEL_PATHS = {
@@ -55,12 +55,17 @@ class ModelState:
 
   def __init__(self, context: CLContext, frogpilot_toggles: SimpleNamespace):
     # FrogPilot variables
-    self.enable_navigation = not frogpilot_toggles.navigationless_model
+    self.enable_navigation = frogpilot_toggles.navigation_model
     self.radarless = frogpilot_toggles.radarless_model
 
-    model_path = Path(__file__).parent / f'{MODELS_PATH}/{frogpilot_toggles.model}.thneed'
+    model_path = MODELS_PATH / f'{frogpilot_toggles.model}.thneed'
     if frogpilot_toggles.model != DEFAULT_CLASSIC_MODEL and model_path.exists():
       MODEL_PATHS[ModelRunner.THNEED] = model_path
+
+    metadata_path = METADATA_PATH
+    desired_metadata_path = MODELS_PATH / f'supercombo_metadata_{frogpilot_toggles.model_version}.pkl'
+    if frogpilot_toggles.model != DEFAULT_CLASSIC_MODEL and desired_metadata_path.exists():
+      metadata_path = desired_metadata_path
 
     self.frame = ModelFrame(context)
     self.wide_frame = ModelFrame(context)
@@ -70,13 +75,17 @@ class ModelState:
       'traffic_convention': np.zeros(ModelConstants.TRAFFIC_CONVENTION_LEN, dtype=np.float32),
       'lateral_control_params': np.zeros(ModelConstants.LATERAL_CONTROL_PARAMS_LEN, dtype=np.float32),
       'prev_desired_curv': np.zeros(ModelConstants.PREV_DESIRED_CURV_LEN * (ModelConstants.HISTORY_BUFFER_LEN+1), dtype=np.float32),
-      **({'nav_features': np.zeros(ModelConstants.NAV_FEATURE_LEN, dtype=np.float32),
-          'nav_instructions': np.zeros(ModelConstants.NAV_INSTRUCTION_LEN, dtype=np.float32)} if self.enable_navigation else {}),
       'features_buffer': np.zeros((ModelConstants.HISTORY_BUFFER_LEN) * ModelConstants.FEATURE_LEN, dtype=np.float32),
-      **({'radar_tracks': np.zeros(ModelConstants.RADAR_TRACKS_LEN * ModelConstants.RADAR_TRACKS_WIDTH, dtype=np.float32)} if self.radarless else {}),
     }
 
-    with open(METADATA_PATH, 'rb') as f:
+    if self.enable_navigation:
+      self.inputs['nav_features'] = np.zeros(ModelConstants.NAV_FEATURE_LEN, dtype=np.float32)
+      self.inputs['nav_instructions'] = np.zeros(ModelConstants.NAV_INSTRUCTION_LEN, dtype=np.float32)
+
+    if self.radarless:
+      self.inputs['radar_tracks'] = np.zeros(ModelConstants.RADAR_TRACKS_LEN * ModelConstants.RADAR_TRACKS_WIDTH, dtype=np.float32)
+
+    with open(metadata_path, 'rb') as f:
       model_metadata = pickle.load(f)
 
     self.output_slices = model_metadata['output_slices']
@@ -136,7 +145,7 @@ def main(demo=False):
   # FrogPilot variables
   frogpilot_toggles = get_frogpilot_toggles()
 
-  enable_navigation = not frogpilot_toggles.navigationless_model
+  enable_navigation = frogpilot_toggles.navigation_model
   radarless = frogpilot_toggles.radarless_model
 
   cloudlog.warning("classic_modeld init")
@@ -311,9 +320,14 @@ def main(demo=False):
       'desire': vec_desire,
       'traffic_convention': traffic_convention,
       'lateral_control_params': lateral_control_params,
-      **({'nav_features': nav_features, 'nav_instructions': nav_instructions} if enable_navigation else {}),
-      **({'radar_tracks': radar_tracks} if radarless else {}),
     }
+
+    if enable_navigation:
+      inputs['nav_features'] = nav_features
+      inputs['nav_instructions'] = nav_instructions
+
+    if radarless:
+      inputs['radar_tracks'] = radar_tracks
 
     mt1 = time.perf_counter()
     model_output = model.run(buf_main, buf_extra, model_transform_main, model_transform_extra, inputs, prepare_only)

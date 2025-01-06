@@ -1,6 +1,8 @@
 import cereal.messaging as messaging
 
 from openpilot.common.conversions import Conversions as CV
+from openpilot.common.filter_simple import FirstOrderFilter
+from openpilot.common.realtime import DT_MDL
 
 from openpilot.selfdrive.controls.lib.drive_helpers import V_CRUISE_UNSET
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import A_CHANGE_COST, DANGER_ZONE_COST, J_EGO_COST, STOP_DISTANCE
@@ -11,7 +13,7 @@ from openpilot.selfdrive.frogpilot.controls.lib.frogpilot_acceleration import Fr
 from openpilot.selfdrive.frogpilot.controls.lib.frogpilot_events import FrogPilotEvents
 from openpilot.selfdrive.frogpilot.controls.lib.frogpilot_following import FrogPilotFollowing
 from openpilot.selfdrive.frogpilot.controls.lib.frogpilot_vcruise import FrogPilotVCruise
-from openpilot.selfdrive.frogpilot.frogpilot_utilities import MovingAverageCalculator, calculate_lane_width, calculate_road_curvature
+from openpilot.selfdrive.frogpilot.frogpilot_utilities import calculate_lane_width, calculate_road_curvature
 from openpilot.selfdrive.frogpilot.frogpilot_variables import CRUISING_SPEED, MODEL_LENGTH, NON_DRIVING_GEARS, PLANNER_TIME, THRESHOLD
 
 class FrogPilotPlanner:
@@ -25,10 +27,11 @@ class FrogPilotPlanner:
     self.frogpilot_vcruise = FrogPilotVCruise(self)
     self.lead_one = Lead()
 
-    self.tracking_lead_mac = MovingAverageCalculator()
+    self.tracking_lead_filter = FirstOrderFilter(0, 1, DT_MDL)
 
     self.lateral_check = False
     self.model_stopped = False
+    self.road_curvature_detected = False
     self.slower_lead = False
     self.tracking_lead = False
 
@@ -80,6 +83,7 @@ class FrogPilotPlanner:
     self.model_stopped |= self.frogpilot_vcruise.forcing_stop
 
     self.road_curvature = calculate_road_curvature(modelData, v_ego) if not carState.standstill else 1
+    self.road_curvature_detected = (1 / self.road_curvature)**0.5 < v_ego
 
     self.tracking_lead = self.set_lead_status(carState, v_lead)
     self.v_cruise = self.frogpilot_vcruise.update(carControl, carState, controlsState, frogpilotCarControl, frogpilotCarState, frogpilotNavigation, v_cruise, v_ego, frogpilot_toggles)
@@ -88,11 +92,9 @@ class FrogPilotPlanner:
     following_lead = self.lead_one.status
     following_lead &= self.lead_one.dRel < self.model_length + STOP_DISTANCE
     following_lead &= not carState.standstill or self.tracking_lead
+    return self.tracking_lead_filter.update(1 if following_lead else 0) >= THRESHOLD
 
-    self.tracking_lead_mac.add_data(following_lead)
-    return self.tracking_lead_mac.get_moving_average() >= THRESHOLD
-
-  def publish(self, sm, pm, theme_updated, toggles_updated, frogpilot_toggles):
+  def publish(self, sm, pm, toggles_updated, frogpilot_toggles):
     frogpilot_plan_send = messaging.new_message('frogpilotPlan')
     frogpilot_plan_send.valid = sm.all_checks(service_list=['carState', 'controlsState'])
     frogpilotPlan = frogpilot_plan_send.frogpilotPlan
@@ -136,8 +138,6 @@ class FrogPilotPlanner:
     frogpilotPlan.speedLimitChanged = self.frogpilot_vcruise.speed_limit_changed
     frogpilotPlan.unconfirmedSlcSpeedLimit = self.frogpilot_vcruise.slc.desired_speed_limit
     frogpilotPlan.upcomingSLCSpeedLimit = self.frogpilot_vcruise.slc.upcoming_speed_limit
-
-    frogpilotPlan.themeUpdated = theme_updated
 
     frogpilotPlan.togglesUpdated = toggles_updated
 

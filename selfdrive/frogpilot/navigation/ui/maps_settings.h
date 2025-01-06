@@ -3,7 +3,7 @@
 #include "selfdrive/frogpilot/navigation/ui/navigation_functions.h"
 #include "selfdrive/frogpilot/ui/qt/offroad/frogpilot_settings.h"
 
-class FrogPilotMapsPanel : public FrogPilotListWidget {
+class FrogPilotMapsPanel : public QWidget {
   Q_OBJECT
 
 public:
@@ -32,6 +32,8 @@ private:
   ButtonParamControl *preferredSchedule;
 
   FrogPilotButtonsControl *selectMapsButton;
+
+  FrogPilotSettingsWindow *parent;
 
   LabelControl *africaLabel;
   LabelControl *antarcticaLabel;
@@ -72,6 +74,7 @@ private:
   bool countriesOpen;
   bool downloadActive;
   bool hasMapsSelected;
+  bool mapdExists;
 
   qint64 startTime;
 

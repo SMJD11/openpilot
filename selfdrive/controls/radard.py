@@ -14,7 +14,7 @@ from openpilot.common.swaglog import cloudlog
 
 from openpilot.common.simple_kalman import KF1D
 
-from openpilot.selfdrive.frogpilot.frogpilot_variables import get_frogpilot_toggles
+from openpilot.selfdrive.frogpilot.frogpilot_variables import LANE_WIDTH, get_frogpilot_toggles
 
 # Default lead acceleration decay set to 50% at 1s
 _LEAD_ACCEL_TAU = 1.5
@@ -111,7 +111,7 @@ class Track:
 
   def potential_adjacent_lead(self, far: bool, lane_width: float, left: bool, model_data: capnp._DynamicStructReader):
     adjacent_lane_max = float('inf') if far else lane_width * 1.5
-    adjacent_lane_min = max(lane_width * 1.5, 4.5) if far else max(lane_width * 0.5, 1.5)
+    adjacent_lane_min = max(lane_width * 1.5, LANE_WIDTH * 1.5) if far else max(lane_width * 0.5, LANE_WIDTH / 2)
 
     y_delta = self.yRel + interp(self.dRel, model_data.position.x, model_data.position.y)
 
@@ -195,6 +195,12 @@ def get_lead(v_ego: float, ready: bool, tracks: dict[int, Track], lead_msg: capn
   elif (track is None) and ready and (lead_msg.prob > frogpilot_toggles.lead_detection_probability):
     lead_dict = get_RadarState_from_vision(lead_msg, v_ego, model_v_ego)
 
+  if not lead_dict['status'] and frogpilot_toggles.far_lead_tracking:
+    far_lead_tracks = [c for c in tracks.values() if abs(c.yRel) < LANE_WIDTH / 2 and c.vLead > 1]
+    if len(far_lead_tracks) > 0:
+      closest_track = min(far_lead_tracks, key=lambda c: c.dRel)
+      lead_dict = closest_track.get_RadarState()
+
   if low_speed_override:
     low_speed_tracks = [c for c in tracks.values() if c.potential_low_speed_lead(v_ego)]
     if len(low_speed_tracks) > 0:
@@ -216,20 +222,6 @@ def get_lead_adjacent(tracks: dict[int, Track], model_data: capnp._DynamicStruct
   adjacent_tracks = [c for c in tracks.values() if c.vLead > 1 and c.potential_adjacent_lead(far, lane_width, left, model_data)]
   if len(adjacent_tracks) > 0:
     closest_track = min(adjacent_tracks, key=lambda c: c.dRel)
-    lead_dict = closest_track.get_RadarState()
-
-  return lead_dict
-
-
-def get_lead_far(tracks: dict[int, Track], leadOne) -> dict[str, Any]:
-  lead_dict = {'status': False}
-
-  if leadOne.status:
-    return lead_dict
-
-  far_lead_tracks = [c for c in tracks.values() if c.vLead > 1 and abs(c.yRel) < 1.5]
-  if len(far_lead_tracks) > 0:
-    closest_track = min(far_lead_tracks, key=lambda c: c.dRel)
     lead_dict = closest_track.get_RadarState()
 
   return lead_dict
@@ -314,7 +306,6 @@ class RadarD:
       self.radar_state.leadTwo = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[1], model_v_ego, self.frogpilot_toggles, sm['frogpilotCarState'], low_speed_override=False)
 
     if self.frogpilot_toggles.adjacent_lead_tracking and self.ready:
-      self.radar_state.leadFar = get_lead_far(self.tracks, self.radar_state.leadOne)
       self.radar_state.leadLeft = get_lead_adjacent(self.tracks, sm['modelV2'], sm['frogpilotPlan'].laneWidthLeft, left=True)
       self.radar_state.leadLeftFar = get_lead_adjacent(self.tracks, sm['modelV2'], sm['frogpilotPlan'].laneWidthLeft, left=True, far=True)
       self.radar_state.leadRight = get_lead_adjacent(self.tracks, sm['modelV2'], sm['frogpilotPlan'].laneWidthRight, left=False)

@@ -2,7 +2,7 @@
 
 #include "selfdrive/frogpilot/ui/qt/offroad/frogpilot_settings.h"
 
-class FrogPilotPrimelessPanel : public FrogPilotListWidget {
+class FrogPilotPrimelessPanel : public QWidget {
   Q_OBJECT
 
 public:
@@ -13,7 +13,7 @@ signals:
   void openMapBoxInstructions();
 
 private:
-  void createMapboxKeyControl(ButtonControl *&control, const QString &label, const std::string &paramKey, const QString &prefix);
+  void createMapboxKeyControl(ButtonControl *&control, const QString &label, const std::string &paramKey, const QString &prefix, FrogPilotListWidget *list);
   void displayMapboxInstructions(bool visible);
   void hideEvent(QHideEvent *event);
   void mousePressEvent(QMouseEvent *event);
@@ -26,6 +26,8 @@ private:
   ButtonControl *setupButton;
 
   ButtonParamControl *searchInput;
+
+  FrogPilotSettingsWindow *parent;
 
   LabelControl *ipLabel;
 

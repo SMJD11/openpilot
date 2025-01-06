@@ -1,6 +1,12 @@
 #include "selfdrive/frogpilot/ui/qt/offroad/visual_settings.h"
 
-FrogPilotVisualsPanel::FrogPilotVisualsPanel(FrogPilotSettingsWindow *parent) : FrogPilotListWidget(parent), parent(parent) {
+FrogPilotVisualsPanel::FrogPilotVisualsPanel(FrogPilotSettingsWindow *parent) : QWidget(parent), parent(parent) {
+  QVBoxLayout *visualsLayout = new QVBoxLayout(this);
+  visualsLayout->setContentsMargins(50, 25, 50, 25);
+
+  FrogPilotListWidget *list = new FrogPilotListWidget(this);
+  visualsLayout->addWidget(list);
+
   const std::vector<std::tuple<QString, QString, QString, QString>> visualToggles {
     {"QOLVisuals", tr("Accessibility"), tr("Visual features to improve your overall openpilot experience."), "../frogpilot/assets/toggle_icons/icon_accessibility.png"},
     {"CameraView", tr("Camera View"), tr("Changes the camera view display. This is purely a visual change and doesn't impact how openpilot drives."), ""},
@@ -91,7 +97,13 @@ FrogPilotVisualsPanel::FrogPilotVisualsPanel(FrogPilotSettingsWindow *parent) : 
     } else if (param == "DeveloperUI") {
       FrogPilotParamManageControl *developerUIToggle = new FrogPilotParamManageControl(param, title, desc, icon);
       QObject::connect(developerUIToggle, &FrogPilotParamManageControl::manageButtonClicked, [this]() {
-        showToggles(developerUIKeys);
+        std::set<QString> modifiedDeveloperUIKeys = developerUIKeys;
+
+        if (!hasOpenpilotLongitudinal) {
+          modifiedDeveloperUIKeys.erase("DeveloperWidgets");
+        }
+
+        showToggles(modifiedDeveloperUIKeys);
       });
       visualToggle = developerUIToggle;
     } else if (param == "DeveloperMetrics") {
@@ -165,7 +177,12 @@ FrogPilotVisualsPanel::FrogPilotVisualsPanel(FrogPilotSettingsWindow *parent) : 
         std::set<QString> modifiedDeveloperWidgetKeys = developerWidgetKeys;
 
         if (!hasOpenpilotLongitudinal) {
+          modifiedDeveloperWidgetKeys.erase("ShowCEMStatus");
           modifiedDeveloperWidgetKeys.erase("ShowStoppingPoint");
+        }
+
+        if (!params.getBool("ConditionalExperimentalMode")) {
+          modifiedDeveloperWidgetKeys.erase("ShowCEMStatus");
         }
 
         showToggles(modifiedDeveloperWidgetKeys);
@@ -268,7 +285,7 @@ FrogPilotVisualsPanel::FrogPilotVisualsPanel(FrogPilotSettingsWindow *parent) : 
       visualToggle = new ParamControl(param, title, desc, icon);
     }
 
-    addItem(visualToggle);
+    list->addItem(visualToggle);
     toggles[param] = visualToggle;
 
     if (FrogPilotParamManageControl *frogPilotManageToggle = qobject_cast<FrogPilotParamManageControl*>(visualToggle)) {

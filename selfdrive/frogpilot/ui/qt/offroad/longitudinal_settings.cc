@@ -1,6 +1,12 @@
 #include "selfdrive/frogpilot/ui/qt/offroad/longitudinal_settings.h"
 
-FrogPilotLongitudinalPanel::FrogPilotLongitudinalPanel(FrogPilotSettingsWindow *parent) : FrogPilotListWidget(parent), parent(parent) {
+FrogPilotLongitudinalPanel::FrogPilotLongitudinalPanel(FrogPilotSettingsWindow *parent) : QWidget(parent), parent(parent) {
+  QVBoxLayout *longitudinalLayout = new QVBoxLayout(this);
+  longitudinalLayout->setContentsMargins(50, 25, 50, 25);
+
+  FrogPilotListWidget *list = new FrogPilotListWidget(this);
+  longitudinalLayout->addWidget(list);
+
   const std::vector<std::tuple<QString, QString, QString, QString>> longitudinalToggles {
     {"ConditionalExperimental", tr("Conditional Experimental Mode"), tr("Automatically switch to 'Experimental Mode' when specific conditions are met."), "../frogpilot/assets/toggle_icons/icon_conditional.png"},
     {"CESpeed", tr("Below"), tr("Triggers 'Experimental Mode' when driving below the set speed without a lead vehicle."), ""},
@@ -425,7 +431,7 @@ FrogPilotLongitudinalPanel::FrogPilotLongitudinalPanel(FrogPilotSettingsWindow *
       longitudinalToggle = new ParamControl(param, title, desc, icon);
     }
 
-    addItem(longitudinalToggle);
+    list->addItem(longitudinalToggle);
     toggles[param] = longitudinalToggle;
 
     if (FrogPilotParamManageControl *frogPilotManageToggle = qobject_cast<FrogPilotParamManageControl*>(longitudinalToggle)) {

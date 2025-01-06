@@ -2,13 +2,21 @@
 
 #include "selfdrive/frogpilot/ui/qt/offroad/data_settings.h"
 
-FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPilotListWidget(parent) {
+FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : QWidget(parent), parent(parent) {
+  QVBoxLayout *dataLayout = new QVBoxLayout(this);
+  dataLayout->setContentsMargins(50, 25, 50, 25);
+
+  FrogPilotListWidget *list = new FrogPilotListWidget(this);
+  dataLayout->addWidget(list);
+
   ButtonControl *deleteDrivingDataBtn = new ButtonControl(tr("Delete Driving Footage and Data"), tr("DELETE"), tr("Permanently deletes all stored driving footage and data from your device. Ideal for maintaining privacy or freeing up space."));
   QObject::connect(deleteDrivingDataBtn, &ButtonControl::clicked, [=]() {
     QDir realdataDir("/data/media/0/realdata");
 
     if (ConfirmationDialog::confirm(tr("Are you sure you want to permanently delete all of your driving footage and data?"), tr("Delete"), this)) {
       std::thread([=]() mutable {
+        utilityActive = true;
+
         deleteDrivingDataBtn->setEnabled(false);
 
         deleteDrivingDataBtn->setValue(tr("Deleting..."));
@@ -23,10 +31,12 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
         deleteDrivingDataBtn->setEnabled(true);
 
         deleteDrivingDataBtn->setValue("");
+
+        utilityActive = false;
       }).detach();
     }
   });
-  addItem(deleteDrivingDataBtn);
+  list->addItem(deleteDrivingDataBtn);
 
   FrogPilotButtonsControl *screenRecordingsBtn = new FrogPilotButtonsControl(tr("Screen Recordings"), tr("Manage your screen recordings."), {tr("DELETE"), tr("DELETE ALL"), tr("RENAME")});
   QObject::connect(screenRecordingsBtn, &FrogPilotButtonsControl::buttonClicked, [=](int id) {
@@ -38,6 +48,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
       if (!selection.isEmpty()) {
         if (ConfirmationDialog::confirm(tr("Are you sure you want to delete this recording?"), tr("Delete"), this)) {
           std::thread([=]() {
+            utilityActive = true;
+
             screenRecordingsBtn->setEnabled(false);
 
             screenRecordingsBtn->setValue(tr("Deleting..."));
@@ -57,6 +69,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
 
             screenRecordingsBtn->setVisibleButton(1, true);
             screenRecordingsBtn->setVisibleButton(2, true);
+
+            utilityActive = false;
           }).detach();
         }
       }
@@ -64,6 +78,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
     } else if (id == 1) {
       if (ConfirmationDialog::confirm(tr("Are you sure you want to delete all screen recordings?"), tr("Delete All"), this)) {
         std::thread([=]() mutable {
+          utilityActive = true;
+
           screenRecordingsBtn->setEnabled(false);
 
           screenRecordingsBtn->setValue(tr("Deleting..."));
@@ -84,6 +100,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
 
           screenRecordingsBtn->setVisibleButton(0, true);
           screenRecordingsBtn->setVisibleButton(2, true);
+
+          utilityActive = false;
         }).detach();
       }
 
@@ -97,6 +115,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
             return;
           }
           std::thread([=]() {
+            utilityActive = true;
+
             screenRecordingsBtn->setEnabled(false);
 
             screenRecordingsBtn->setValue(tr("Renaming..."));
@@ -119,12 +139,14 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
 
             screenRecordingsBtn->setVisibleButton(0, true);
             screenRecordingsBtn->setVisibleButton(1, true);
+
+            utilityActive = false;
           }).detach();
         }
       }
     }
   });
-  addItem(screenRecordingsBtn);
+  list->addItem(screenRecordingsBtn);
 
   FrogPilotButtonsControl *frogpilotBackupBtn = new FrogPilotButtonsControl(tr("FrogPilot Backups"), tr("Manage your FrogPilot backups."), {tr("BACKUP"), tr("DELETE"), tr("DELETE ALL"), tr("RESTORE")});
   QObject::connect(frogpilotBackupBtn, &FrogPilotButtonsControl::buttonClicked, [=](int id) {
@@ -140,6 +162,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
         }
         bool compressed = FrogPilotConfirmationDialog::yesorno(tr("Do you want to compress this backup? The final result will be 2.25x smaller and will run in the background, but can take 10+ minutes."), this);
         std::thread([=]() {
+          utilityActive = true;
+
           frogpilotBackupBtn->setEnabled(false);
 
           frogpilotBackupBtn->setValue(tr("Backing up..."));
@@ -175,6 +199,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
           frogpilotBackupBtn->setVisibleButton(1, true);
           frogpilotBackupBtn->setVisibleButton(2, true);
           frogpilotBackupBtn->setVisibleButton(3, true);
+
+          utilityActive = false;
         }).detach();
       }
 
@@ -183,6 +209,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
       if (!selection.isEmpty()) {
         if (ConfirmationDialog::confirm(tr("Are you sure you want to delete this backup?"), tr("Delete"), this)) {
           std::thread([=]() {
+            utilityActive = true;
+
             frogpilotBackupBtn->setVisibleButton(0, false);
             frogpilotBackupBtn->setVisibleButton(2, false);
             frogpilotBackupBtn->setVisibleButton(3, false);
@@ -205,6 +233,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
             frogpilotBackupBtn->setVisibleButton(0, true);
             frogpilotBackupBtn->setVisibleButton(2, true);
             frogpilotBackupBtn->setVisibleButton(3, true);
+
+            utilityActive = false;
           }).detach();
         }
       }
@@ -212,6 +242,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
     } else if (id == 2) {
       if (ConfirmationDialog::confirm(tr("Are you sure you want to delete all FrogPilot backups?"), tr("Delete All"), this)) {
         std::thread([=]() mutable {
+          utilityActive = true;
+
           frogpilotBackupBtn->setEnabled(false);
 
           frogpilotBackupBtn->setVisibleButton(0, false);
@@ -234,6 +266,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
           frogpilotBackupBtn->setVisibleButton(0, true);
           frogpilotBackupBtn->setVisibleButton(1, true);
           frogpilotBackupBtn->setVisibleButton(3, true);
+
+          utilityActive = false;
         }).detach();
       }
 
@@ -242,6 +276,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
       if (!selection.isEmpty()) {
         if (ConfirmationDialog::confirm(tr("Are you sure you want to restore this version of FrogPilot?"), tr("Restore"), this)) {
           std::thread([=]() {
+            utilityActive = true;
+
             frogpilotBackupBtn->setEnabled(false);
 
             frogpilotBackupBtn->setVisibleButton(0, false);
@@ -289,7 +325,7 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
       }
     }
   });
-  addItem(frogpilotBackupBtn);
+  list->addItem(frogpilotBackupBtn);
 
   FrogPilotButtonsControl *toggleBackupBtn = new FrogPilotButtonsControl(tr("Toggle Backups"), tr("Manage your toggle backups."), {tr("BACKUP"), tr("DELETE"), tr("DELETE ALL"), tr("RESTORE")});
   QObject::connect(toggleBackupBtn, &FrogPilotButtonsControl::buttonClicked, [=](int id) {
@@ -304,6 +340,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
           return;
         }
         std::thread([=]() {
+          utilityActive = true;
+
           toggleBackupBtn->setEnabled(false);
 
           toggleBackupBtn->setValue(tr("Backing up..."));
@@ -332,6 +370,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
           toggleBackupBtn->setVisibleButton(1, true);
           toggleBackupBtn->setVisibleButton(2, true);
           toggleBackupBtn->setVisibleButton(3, true);
+
+          utilityActive = false;
         }).detach();
       }
 
@@ -340,6 +380,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
       if (!selection.isEmpty()) {
         if (ConfirmationDialog::confirm(tr("Are you sure you want to delete this backup?"), tr("Delete"), this)) {
           std::thread([=]() {
+            utilityActive = true;
+
             toggleBackupBtn->setVisibleButton(0, false);
             toggleBackupBtn->setVisibleButton(2, false);
             toggleBackupBtn->setVisibleButton(3, false);
@@ -358,6 +400,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
             toggleBackupBtn->setVisibleButton(0, true);
             toggleBackupBtn->setVisibleButton(2, true);
             toggleBackupBtn->setVisibleButton(3, true);
+
+            utilityActive = false;
           }).detach();
         }
       }
@@ -365,6 +409,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
     } else if (id == 2) {
       if (ConfirmationDialog::confirm(tr("Are you sure you want to delete all toggle backups?"), tr("Delete All"), this)) {
         std::thread([=]() mutable {
+          utilityActive = true;
+
           toggleBackupBtn->setEnabled(false);
 
           toggleBackupBtn->setVisibleButton(0, false);
@@ -387,6 +433,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
           toggleBackupBtn->setVisibleButton(0, true);
           toggleBackupBtn->setVisibleButton(1, true);
           toggleBackupBtn->setVisibleButton(3, true);
+
+          utilityActive = false;
         }).detach();
       }
 
@@ -395,6 +443,8 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
       if (!selection.isEmpty()) {
         if (ConfirmationDialog::confirm(tr("Are you sure you want to restore this toggle backup?"), tr("Restore"), this)) {
           std::thread([=]() {
+            utilityActive = true;
+
             toggleBackupBtn->setEnabled(false);
 
             toggleBackupBtn->setVisibleButton(0, false);
@@ -423,10 +473,22 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
             toggleBackupBtn->setVisibleButton(0, true);
             toggleBackupBtn->setVisibleButton(1, true);
             toggleBackupBtn->setVisibleButton(2, true);
+
+            utilityActive = false;
           }).detach();
         }
       }
     }
   });
-  addItem(toggleBackupBtn);
+  list->addItem(toggleBackupBtn);
+
+  QObject::connect(uiState(), &UIState::uiUpdate, this, &FrogPilotDataPanel::updateState);
+}
+
+void FrogPilotDataPanel::updateState(const UIState &s) {
+  if (!isVisible()) {
+    return;
+  }
+
+  parent->keepScreenOn = utilityActive;
 }

@@ -1,16 +1,22 @@
 #include "selfdrive/frogpilot/navigation/ui/primeless_settings.h"
 
-FrogPilotPrimelessPanel::FrogPilotPrimelessPanel(FrogPilotSettingsWindow *parent) : FrogPilotListWidget(parent) {
-  addItem(ipLabel = new LabelControl(tr("Manage Your Settings At"), tr("Device Offline")));
+FrogPilotPrimelessPanel::FrogPilotPrimelessPanel(FrogPilotSettingsWindow *parent) : QWidget(parent), parent(parent) {
+  QVBoxLayout *primelessLayout = new QVBoxLayout(this);
+  primelessLayout->setContentsMargins(50, 25, 50, 25);
+
+  FrogPilotListWidget *list = new FrogPilotListWidget(this);
+  primelessLayout->addWidget(list);
+
+  list->addItem(ipLabel = new LabelControl(tr("Manage Your Settings At"), tr("Device Offline")));
 
   std::vector<QString> searchOptions{tr("MapBox"), tr("Amap"), tr("Google")};
   searchInput = new ButtonParamControl("SearchInput", tr("Destination Search Provider"),
                                     tr("The search provider used for destination queries in 'Navigate on Openpilot'. Options include 'MapBox' (recommended), 'Amap', and 'Google Maps'."),
                                        "", searchOptions);
-  addItem(searchInput);
+  list->addItem(searchInput);
 
-  createMapboxKeyControl(publicMapboxKeyControl, tr("Public Mapbox Key"), "MapboxPublicKey", "pk.");
-  createMapboxKeyControl(secretMapboxKeyControl, tr("Secret Mapbox Key"), "MapboxSecretKey", "sk.");
+  createMapboxKeyControl(publicMapboxKeyControl, tr("Public Mapbox Key"), "MapboxPublicKey", "pk.", list);
+  createMapboxKeyControl(secretMapboxKeyControl, tr("Secret Mapbox Key"), "MapboxSecretKey", "sk.", list);
 
   setupButton = new ButtonControl(tr("MapBox Setup Instructions"), tr("VIEW"), tr("View the instructions to set up 'MapBox' for 'Primeless Navigation'."), this);
   QObject::connect(setupButton, &ButtonControl::clicked, [this]() {
@@ -18,10 +24,10 @@ FrogPilotPrimelessPanel::FrogPilotPrimelessPanel(FrogPilotSettingsWindow *parent
     openMapBoxInstructions();
     updateStep();
   });
-  addItem(setupButton);
+  list->addItem(setupButton);
 
   imageLabel = new QLabel(this);
-  addItem(imageLabel);
+  list->addItem(imageLabel);
 
   QObject::connect(parent, &FrogPilotSettingsWindow::closeMapBoxInstructions, [this]() {displayMapboxInstructions(false);});
   QObject::connect(uiState(), &UIState::uiUpdate, this, &FrogPilotPrimelessPanel::updateState);
@@ -52,9 +58,11 @@ void FrogPilotPrimelessPanel::updateState() {
 
     updateStep();
   }
+
+  parent->keepScreenOn = imageLabel->isVisible();
 }
 
-void FrogPilotPrimelessPanel::createMapboxKeyControl(ButtonControl *&control, const QString &label, const std::string &paramKey, const QString &prefix) {
+void FrogPilotPrimelessPanel::createMapboxKeyControl(ButtonControl *&control, const QString &label, const std::string &paramKey, const QString &prefix, FrogPilotListWidget *list) {
   control = new ButtonControl(label, "", tr("Manage your %1.").arg(label));
 
   QObject::connect(control, &ButtonControl::clicked, [=] {
@@ -82,7 +90,7 @@ void FrogPilotPrimelessPanel::createMapboxKeyControl(ButtonControl *&control, co
   });
 
   control->setText(params.get(paramKey).empty() ? tr("ADD") : tr("REMOVE"));
-  addItem(control);
+  list->addItem(control);
 }
 
 void FrogPilotPrimelessPanel::hideEvent(QHideEvent *event) {

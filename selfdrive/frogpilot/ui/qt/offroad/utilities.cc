@@ -2,11 +2,19 @@
 
 #include "selfdrive/frogpilot/ui/qt/offroad/utilities.h"
 
-UtilitiesPanel::UtilitiesPanel(FrogPilotSettingsWindow *parent) : FrogPilotListWidget(parent) {
+FrogPilotUtilitiesPanel::FrogPilotUtilitiesPanel(FrogPilotSettingsWindow *parent) : QWidget(parent), parent(parent) {
+  QVBoxLayout *utilitiesLayout = new QVBoxLayout(this);
+  utilitiesLayout->setContentsMargins(50, 25, 50, 25);
+
+  FrogPilotListWidget *list = new FrogPilotListWidget(this);
+  utilitiesLayout->addWidget(list);
+
   ButtonControl *flashPandaBtn = new ButtonControl(tr("Flash Panda"), tr("FLASH"), tr("Flashes the Panda device's firmware if you're running into issues."));
   QObject::connect(flashPandaBtn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Are you sure you want to flash the Panda?"), tr("Flash"), this)) {
       std::thread([=]() {
+        utilityActive = true;
+
         flashPandaBtn->setEnabled(false);
         flashPandaBtn->setValue(tr("Flashing..."));
 
@@ -21,7 +29,7 @@ UtilitiesPanel::UtilitiesPanel(FrogPilotSettingsWindow *parent) : FrogPilotListW
       }).detach();
     }
   });
-  addItem(flashPandaBtn);
+  list->addItem(flashPandaBtn);
 
   forceStartedBtn = new FrogPilotButtonsControl(tr("Force Started State"), tr("Forces openpilot either offroad or onroad."), {tr("OFFROAD"), tr("ONROAD"), tr("OFF")}, true);
   QObject::connect(forceStartedBtn, &FrogPilotButtonsControl::buttonClicked, [=](int id) {
@@ -38,12 +46,14 @@ UtilitiesPanel::UtilitiesPanel(FrogPilotSettingsWindow *parent) : FrogPilotListW
     forceStartedBtn->setCheckedButton(id);
   });
   forceStartedBtn->setCheckedButton(2);
-  addItem(forceStartedBtn);
+  list->addItem(forceStartedBtn);
 
   ButtonControl *resetTogglesBtn = new ButtonControl(tr("Reset Toggles to Default"), tr("RESET"), tr("Reset your toggle settings back to their default settings."));
   QObject::connect(resetTogglesBtn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Are you sure you want to completely reset all of your toggle settings?"), tr("Reset"), this)) {
       std::thread([=]() mutable {
+        utilityActive = true;
+
         resetTogglesBtn->setEnabled(false);
         resetTogglesBtn->setValue(tr("Resetting..."));
 
@@ -59,5 +69,15 @@ UtilitiesPanel::UtilitiesPanel(FrogPilotSettingsWindow *parent) : FrogPilotListW
       }).detach();
     }
   });
-  addItem(resetTogglesBtn);
+  list->addItem(resetTogglesBtn);
+
+  QObject::connect(uiState(), &UIState::uiUpdate, this, &FrogPilotUtilitiesPanel::updateState);
+}
+
+void FrogPilotUtilitiesPanel::updateState(const UIState &s) {
+  if (!isVisible()) {
+    return;
+  }
+
+  parent->keepScreenOn = utilityActive;
 }

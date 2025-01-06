@@ -1,6 +1,12 @@
 #include "selfdrive/frogpilot/ui/qt/offroad/device_settings.h"
 
-FrogPilotDevicePanel::FrogPilotDevicePanel(FrogPilotSettingsWindow *parent) : FrogPilotListWidget(parent), parent(parent) {
+FrogPilotDevicePanel::FrogPilotDevicePanel(FrogPilotSettingsWindow *parent) : parent(parent) {
+  QVBoxLayout *deviceLayout = new QVBoxLayout(this);
+  deviceLayout->setContentsMargins(50, 25, 50, 25);
+
+  FrogPilotListWidget *list = new FrogPilotListWidget(this);
+  deviceLayout->addWidget(list);
+
   const std::vector<std::tuple<QString, QString, QString, QString>> deviceToggles {
     {"DeviceManagement", tr("Device Settings"), tr("Device behavior settings."), "../frogpilot/assets/toggle_icons/icon_device.png"},
     {"DeviceShutdown", tr("Device Shutdown Timer"), tr("Controls how long the device stays on after you stop driving."), ""},
@@ -62,7 +68,7 @@ FrogPilotDevicePanel::FrogPilotDevicePanel(FrogPilotSettingsWindow *parent) : Fr
       deviceToggle = new ParamControl(param, title, desc, icon);
     }
 
-    addItem(deviceToggle);
+    list->addItem(deviceToggle);
     toggles[param] = deviceToggle;
 
     if (FrogPilotParamManageControl *frogPilotManageToggle = qobject_cast<FrogPilotParamManageControl*>(deviceToggle)) {

@@ -21,7 +21,7 @@ FrogPilot is a fully open-sourced fork of openpilot, featuring clear and concise
 ------
 FrogPilot was last updated on:
 
-**January 1st, 2025**
+**January 18th, 2025**
 
 Features
 ------

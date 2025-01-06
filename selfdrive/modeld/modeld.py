@@ -58,15 +58,14 @@ class ModelState:
     # FrogPilot variables
     self.use_desired_curvature = frogpilot_toggles.desired_curvature_model
 
-    model_path = Path(__file__).parent / f'{MODELS_PATH}/{frogpilot_toggles.model}.thneed'
+    model_path = MODELS_PATH / f'{frogpilot_toggles.model}.thneed'
     if frogpilot_toggles.model != DEFAULT_MODEL and model_path.exists():
       MODEL_PATHS[ModelRunner.THNEED] = model_path
 
     metadata_path = METADATA_PATH
-    if self.use_desired_curvature:
-      desired_metadata_path = Path(__file__).parent / 'models/desired_curvature_supercombo_metadata.pkl'
-      if desired_metadata_path.exists():
-        metadata_path = desired_metadata_path
+    desired_metadata_path = MODELS_PATH / f'supercombo_metadata_{frogpilot_toggles.model_version}.pkl'
+    if frogpilot_toggles.model != DEFAULT_MODEL and desired_metadata_path.exists():
+      metadata_path = desired_metadata_path
 
     self.frame = ModelFrame(context)
     self.wide_frame = ModelFrame(context)
@@ -79,10 +78,12 @@ class ModelState:
     self.inputs = {
       'desire': np.zeros(ModelConstants.DESIRE_LEN * (ModelConstants.HISTORY_BUFFER_LEN+1), dtype=np.float32),
       'traffic_convention': np.zeros(ModelConstants.TRAFFIC_CONVENTION_LEN, dtype=np.float32),
-      **({'lateral_control_params': np.zeros(ModelConstants.LATERAL_CONTROL_PARAMS_LEN, dtype=np.float32)} if self.use_desired_curvature else {}),
-      **({'prev_desired_curv': np.zeros(ModelConstants.PREV_DESIRED_CURV_LEN * (ModelConstants.HISTORY_BUFFER_LEN+1), dtype=np.float32)} if self.use_desired_curvature else {}),
       'features_buffer': np.zeros(ModelConstants.HISTORY_BUFFER_LEN * ModelConstants.FEATURE_LEN, dtype=np.float32),
     }
+
+    if self.use_desired_curvature:
+      self.inputs['lateral_control_params'] = np.zeros(ModelConstants.LATERAL_CONTROL_PARAMS_LEN, dtype=np.float32)
+      self.inputs['prev_desired_curv'] = np.zeros(ModelConstants.PREV_DESIRED_CURV_LEN * (ModelConstants.HISTORY_BUFFER_LEN+1), dtype=np.float32)
 
     with open(metadata_path, 'rb') as f:
       model_metadata = pickle.load(f)
@@ -290,8 +291,10 @@ def main(demo=False):
     inputs:dict[str, np.ndarray] = {
       'desire': vec_desire,
       'traffic_convention': traffic_convention,
-      **({'lateral_control_params': lateral_control_params} if use_desired_curvature else {}),
       }
+
+    if use_desired_curvature:
+      inputs['lateral_control_params'] = lateral_control_params
 
     mt1 = time.perf_counter()
     model_output = model.run(buf_main, buf_extra, model_transform_main, model_transform_extra, inputs, prepare_only)
@@ -314,8 +317,10 @@ def main(demo=False):
       DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob, sm['frogpilotPlan'], frogpilot_toggles)
       modelv2_send.modelV2.meta.laneChangeState = DH.lane_change_state
       modelv2_send.modelV2.meta.laneChangeDirection = DH.lane_change_direction
+      modelv2_send.modelV2.meta.turnDirection = DH.turn_direction
       drivingdata_send.drivingModelData.meta.laneChangeState = DH.lane_change_state
       drivingdata_send.drivingModelData.meta.laneChangeDirection = DH.lane_change_direction
+      drivingdata_send.drivingModelData.meta.turnDirection = DH.turn_direction
 
       fill_pose_msg(posenet_send, model_output, meta_main.frame_id, vipc_dropped_frames, meta_main.timestamp_eof, live_calib_seen)
       pm.send('modelV2', modelv2_send)

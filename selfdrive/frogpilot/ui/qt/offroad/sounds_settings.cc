@@ -28,7 +28,13 @@ void playSound(const std::string &alert, int volume) {
   params_memory.putBool("TestingSound", false);
 }
 
-FrogPilotSoundsPanel::FrogPilotSoundsPanel(FrogPilotSettingsWindow *parent) : FrogPilotListWidget(parent), parent(parent) {
+FrogPilotSoundsPanel::FrogPilotSoundsPanel(FrogPilotSettingsWindow *parent) : QWidget(parent), parent(parent) {
+  QVBoxLayout *soundsLayout = new QVBoxLayout(this);
+  soundsLayout->setContentsMargins(50, 25, 50, 25);
+
+  FrogPilotListWidget *list = new FrogPilotListWidget(this);
+  soundsLayout->addWidget(list);
+
   const std::vector<std::tuple<QString, QString, QString, QString>> soundsToggles {
     {"AlertVolumeControl", tr("Alert Volume Controller"), tr("Control the volume level for each individual sound in openpilot."), "../frogpilot/assets/toggle_icons/icon_mute.png"},
     {"DisengageVolume", tr("Disengage Volume"), tr("Related alerts:\n\nAdaptive Cruise Disabled\nParking Brake Engaged\nBrake Pedal Pressed\nSpeed too Low"), ""},
@@ -89,7 +95,7 @@ FrogPilotSoundsPanel::FrogPilotSoundsPanel(FrogPilotSettingsWindow *parent) : Fr
       soundsToggle = new ParamControl(param, title, desc, icon);
     }
 
-    addItem(soundsToggle);
+    list->addItem(soundsToggle);
     toggles[param] = soundsToggle;
 
     if (FrogPilotParamManageControl *frogPilotManageToggle = qobject_cast<FrogPilotParamManageControl*>(soundsToggle)) {

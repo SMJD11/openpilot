@@ -8,13 +8,11 @@ import urllib.request
 
 from pathlib import Path
 
-from openpilot.common.basedir import BASEDIR
-
 from openpilot.selfdrive.frogpilot.assets.download_functions import GITLAB_URL, download_file, get_repository_url, handle_error, handle_request_error, verify_download
 from openpilot.selfdrive.frogpilot.frogpilot_utilities import delete_file
 from openpilot.selfdrive.frogpilot.frogpilot_variables import DEFAULT_MODEL, DEFAULT_CLASSIC_MODEL, MODELS_PATH, params, params_memory
 
-VERSION = "v11"
+VERSION = "v12"
 
 CANCEL_DOWNLOAD_PARAM = "CancelModelDownload"
 DOWNLOAD_PROGRESS_PARAM = "ModelDownloadProgress"
@@ -65,6 +63,38 @@ class ModelManager:
       handle_request_error(f"Failed to fetch model sizes from {'GitHub' if 'github' in repo_url else 'GitLab'}: {error}", None, None, None, None)
       return {}
 
+  @staticmethod
+  def fetch_all_metadata_sizes(repo_url):
+    project_path = "FrogAi/FrogPilot-Resources"
+    branch = "Model-Metadata"
+
+    if "github" in repo_url:
+      api_url = f"https://api.github.com/repos/{project_path}/contents?ref={branch}"
+    elif "gitlab" in repo_url:
+      api_url = f"https://gitlab.com/api/v4/projects/{urllib.parse.quote_plus(project_path)}/repository/tree?ref={branch}"
+    else:
+      return {}
+
+    try:
+      response = requests.get(api_url)
+      response.raise_for_status()
+      metadata_files = [file for file in response.json() if re.match(r'supercombo_metadata_v\d+\.pkl', file['name'])]
+
+      if "gitlab" in repo_url:
+        metadata_sizes = {}
+        for file in metadata_files:
+          file_path = file['path']
+          metadata_url = f"https://gitlab.com/api/v4/projects/{urllib.parse.quote_plus(project_path)}/repository/files/{urllib.parse.quote_plus(file_path)}/raw?ref={branch}"
+          metadata_response = requests.head(metadata_url)
+          metadata_response.raise_for_status()
+          metadata_sizes[file['name']] = int(metadata_response.headers.get('content-length', 0))
+        return metadata_sizes
+      else:
+        return {file['name']: file['size'] for file in metadata_files if 'size' in file}
+    except Exception as error:
+      handle_request_error(f"Failed to fetch metadata sizes from {'GitHub' if 'github' in repo_url else 'GitLab'}: {error}", None, None, None, None)
+      return {}
+
   def handle_verification_failure(self, model, model_path):
     print(f"Verification failed for model {model}. Retrying from GitLab...")
     model_url = f"{GITLAB_URL}/Models/{model}.thneed"
@@ -111,16 +141,41 @@ class ModelManager:
     else:
       self.handle_verification_failure(model_to_download, model_path)
 
+  def download_missing_metadata(self, repo_url):
+    metadata_sizes = self.fetch_all_metadata_sizes(repo_url)
+    if not metadata_sizes:
+      print("No metadata size data available. Skipping metadata downloads.")
+      return
+
+    for metadata_file, expected_size in metadata_sizes.items():
+      metadata_path = MODELS_PATH / metadata_file
+
+      if metadata_path.is_file():
+        local_size = metadata_path.stat().st_size
+        if local_size == expected_size:
+          continue
+        print(f"Metadata {metadata_file} is outdated. Deleting...")
+        delete_file(metadata_path)
+
+      metadata_url = f"{repo_url}/Model-Metadata/{metadata_file}"
+      print(f"Downloading metadata: {metadata_file}")
+      download_file(CANCEL_DOWNLOAD_PARAM, metadata_path, DOWNLOAD_PROGRESS_PARAM, metadata_url, MODEL_DOWNLOAD_PARAM, params_memory)
+
+      if verify_download(metadata_path, metadata_url):
+        print(f"Metadata {metadata_file} downloaded and verified successfully!")
+      else:
+        handle_error(metadata_path, "Verification failed...", "Metadata verification failed", MODEL_DOWNLOAD_PARAM, DOWNLOAD_PROGRESS_PARAM, params_memory)
+
   @staticmethod
   def copy_default_model():
     classic_default_model_path = MODELS_PATH / f"{DEFAULT_CLASSIC_MODEL}.thneed"
-    source_path = Path(BASEDIR) / "selfdrive" / "classic_modeld" / "models" / "supercombo.thneed"
+    source_path = Path(__file__).parents[2] / "selfdrive/classic_modeld/models/supercombo.thneed"
     if source_path.is_file() and not classic_default_model_path.is_file():
       shutil.copyfile(source_path, classic_default_model_path)
       print(f"Copied the classic default model from {source_path} to {classic_default_model_path}")
 
     default_model_path = MODELS_PATH / f"{DEFAULT_MODEL}.thneed"
-    source_path = Path(BASEDIR) / "selfdrive" / "modeld" / "models" / "supercombo.thneed"
+    source_path = Path(__file__).parents[2] / "selfdrive/modeld/models/supercombo.thneed"
     if source_path.is_file() and not default_model_path.is_file():
       shutil.copyfile(source_path, default_model_path)
       print(f"Copied the default model from {source_path} to {default_model_path}")
@@ -172,12 +227,8 @@ class ModelManager:
 
     params.put("AvailableModels", ",".join(available_models))
     params.put("AvailableModelNames", ",".join([model['name'] for model in model_info]))
-    params.put("ClassicModels", ",".join([model['id'] for model in model_info if model.get("classic_model", False)]))
-    params.put("ClippedCurvatureModels", ",".join([model['id'] for model in model_info if model.get("clipped_curvature", False)]))
-    params.put("DesiredCurvatureModels", ",".join([model['id'] for model in model_info if model.get("desired_curvature", False)]))
     params.put("ExperimentalModels", ",".join([model['id'] for model in model_info if model.get("experimental", False)]))
-    params.put("NavigationModels", ",".join([model['id'] for model in model_info if "🗺️" in model['name']]))
-    params.put("RadarlessModels", ",".join([model['id'] for model in model_info if "📡" not in model['name']]))
+    params.put("ModelVersions", ",".join([model['version'] for model in model_info if model.get("version", "v0")]))
     print("Models list updated successfully")
 
     return available_models
@@ -198,6 +249,7 @@ class ModelManager:
     if model_info:
       available_models = self.update_model_params(model_info, repo_url)
       self.check_models(available_models, boot_run, repo_url)
+      self.download_missing_metadata(repo_url)
 
   def queue_model_download(self, model, model_name=None):
     while params_memory.get(MODEL_DOWNLOAD_PARAM, encoding='utf-8'):

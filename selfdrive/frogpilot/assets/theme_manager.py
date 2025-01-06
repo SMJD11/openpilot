@@ -7,8 +7,6 @@ from datetime import date, timedelta
 from dateutil import easter
 from pathlib import Path
 
-from openpilot.common.basedir import BASEDIR
-
 from openpilot.selfdrive.frogpilot.assets.download_functions import GITLAB_URL, download_file, get_repository_url, handle_error, verify_download
 from openpilot.selfdrive.frogpilot.frogpilot_utilities import delete_file, extract_zip
 from openpilot.selfdrive.frogpilot.frogpilot_variables import ACTIVE_THEME_PATH, RANDOM_EVENTS_PATH, THEME_SAVE_PATH, params, params_memory, update_frogpilot_toggles
@@ -16,8 +14,8 @@ from openpilot.selfdrive.frogpilot.frogpilot_variables import ACTIVE_THEME_PATH,
 CANCEL_DOWNLOAD_PARAM = "CancelThemeDownload"
 DOWNLOAD_PROGRESS_PARAM = "ThemeDownloadProgress"
 
-HOLIDAY_THEME_PATH = Path(BASEDIR) / "selfdrive" / "frogpilot" / "assets" / "holiday_themes"
-STOCKOP_THEME_PATH = Path(BASEDIR) / "selfdrive" / "frogpilot" / "assets" / "stock_theme"
+HOLIDAY_THEME_PATH = Path(__file__).parent / "holiday_themes"
+STOCKOP_THEME_PATH = Path(__file__).parent / "stock_theme"
 
 def update_theme_asset(asset_type, theme, holiday_theme):
   save_location = ACTIVE_THEME_PATH / asset_type
@@ -97,13 +95,13 @@ class ThemeManager:
     self.downloading_theme = False
 
     self.theme_assets = {
-      "holiday_theme": "",
-      "color_scheme": "",
-      "distance_icons": "",
-      "icon_pack": "",
-      "sound_pack": "",
-      "turn_signal_pack": "",
-      "wheel_image": ""
+      "holiday_theme": "stock",
+      "color_scheme": "stock",
+      "distance_icons": "stock",
+      "icon_pack": "stock",
+      "sound_pack": "stock",
+      "turn_signal_pack": "stock",
+      "wheel_image": "stock"
     }
 
   @staticmethod
@@ -146,7 +144,7 @@ class ThemeManager:
 
     self.theme_assets["holiday_theme"] = "stock"
 
-  def update_active_theme(self, time_validated, frogpilot_toggles):
+  def update_active_theme(self, time_validated, frogpilot_toggles, boot_run=False):
     if time_validated and frogpilot_toggles.holiday_themes:
       self.update_holiday()
     else:
@@ -173,7 +171,7 @@ class ThemeManager:
 
     theme_updated = False
     for asset, (asset_type, current_value) in asset_mappings.items():
-      if current_value != self.theme_assets.get(asset):
+      if current_value != self.theme_assets.get(asset) or boot_run:
         print(f"Updating {asset}: {asset_type} with value {current_value}")
 
         if asset_type == "wheel_image":
@@ -346,26 +344,32 @@ class ThemeManager:
     }
 
     for theme_param, (theme_component, theme_name, downloadable_list) in asset_mappings.items():
-      if theme_name in {"none", "stock"}:
-        continue
-
-      if theme_name.replace('_', ' ').split('.')[0].title() not in downloadable_list:
-        print(f"  {theme_name} for {theme_component} is outdated. Deleting...")
-        delete_file(theme_path)
+      if theme_name.lower() in {"none", "stock"}:
         continue
 
       if theme_component == "steering_wheels":
-        matching_files = list(THEME_SAVE_PATH.joinpath(theme_component).glob(f"{theme_name}.*"))
+        theme_path = THEME_SAVE_PATH / "steering_wheels" / theme_name
+        matching_files = list(theme_path.parent.glob(f"{theme_name}.*"))
         if not matching_files:
           print(f"  {theme_name} for {theme_component} not found. Downloading...")
           self.download_theme(theme_component, theme_name, theme_param)
           update_frogpilot_toggles()
+        elif theme_name.replace('_', ' ').split('.')[0].title() not in downloadable_list:
+          if theme_path.exists():
+            print(f"{theme_name} for {theme_component} is outdated. Deleting...")
+            delete_file(theme_path)
+          continue
       else:
         theme_path = THEME_SAVE_PATH / "theme_packs" / theme_name / theme_component
         if not theme_path.exists():
           print(f"  {theme_name} for {theme_component} not found. Downloading...")
           self.download_theme(theme_component, theme_name, theme_param)
           update_frogpilot_toggles()
+        elif theme_name.replace('_', ' ').split('.')[0].title() not in downloadable_list:
+          if theme_path.exists():
+            print(f"{theme_name} for {theme_component} is outdated. Deleting...")
+            delete_file(theme_path)
+          continue
 
     for dir_path in THEME_SAVE_PATH.glob('**/*'):
       if dir_path.is_dir() and not any(dir_path.iterdir()):

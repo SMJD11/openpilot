@@ -4,7 +4,7 @@
 
 #include "selfdrive/frogpilot/ui/qt/offroad/frogpilot_settings.h"
 
-class FrogPilotVehiclesPanel : public FrogPilotListWidget {
+class FrogPilotVehiclesPanel : public QWidget {
   Q_OBJECT
 
 public:
@@ -23,10 +23,12 @@ private:
 
   QJsonObject frogpilotToggleLevels;
 
+  QMap<QString, QString> carModels;
+
   QString carMake;
   QString carModel;
 
-  QStringList carModels;
+  QStringList models;
 
   ParamControl *forceFingerprint;
 

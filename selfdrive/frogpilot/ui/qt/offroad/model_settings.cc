@@ -1,6 +1,12 @@
 #include "selfdrive/frogpilot/ui/qt/offroad/model_settings.h"
 
-FrogPilotModelPanel::FrogPilotModelPanel(FrogPilotSettingsWindow *parent) : FrogPilotListWidget(parent), parent(parent) {
+FrogPilotModelPanel::FrogPilotModelPanel(FrogPilotSettingsWindow *parent) : QWidget(parent), parent(parent) {
+  QVBoxLayout *modelLayout = new QVBoxLayout(this);
+  modelLayout->setContentsMargins(50, 25, 50, 25);
+
+  FrogPilotListWidget *list = new FrogPilotListWidget(this);
+  modelLayout->addWidget(list);
+
   const std::vector<std::tuple<QString, QString, QString, QString>> modelToggles {
     {"AutomaticallyUpdateModels", tr("Automatically Update and Download Models"), tr("Automatically downloads new models and updates existing ones if needed."), ""},
 
@@ -19,10 +25,10 @@ FrogPilotModelPanel::FrogPilotModelPanel(FrogPilotSettingsWindow *parent) : Frog
 
     if (param == "ModelRandomizer") {
       FrogPilotParamManageControl *modelRandomizerToggle = new FrogPilotParamManageControl(param, title, desc, icon);
-      QObject::connect(modelRandomizerToggle, &FrogPilotParamManageControl::manageButtonClicked, [this]() {
+      QObject::connect(modelRandomizerToggle, &FrogPilotParamManageControl::manageButtonClicked, [this, list]() {
         modelRandomizerOpen = true;
         showToggles(modelRandomizerKeys);
-        updateModelLabels();
+        updateModelLabels(list);
       });
       modelToggle = modelRandomizerToggle;
     } else if (param == "ManageBlacklistedModels") {
@@ -77,11 +83,11 @@ FrogPilotModelPanel::FrogPilotModelPanel(FrogPilotSettingsWindow *parent) : Frog
       modelToggle = blacklistBtn;
     } else if (param == "ResetScores") {
       ButtonControl *resetScoresBtn = new ButtonControl(title, tr("RESET"), desc);
-      QObject::connect(resetScoresBtn, &ButtonControl::clicked, [this]() {
+      QObject::connect(resetScoresBtn, &ButtonControl::clicked, [this, list]() {
         if (FrogPilotConfirmationDialog::yesorno(tr("Are you sure you want to reset all of your model drives and scores?"), this)) {
           params.remove("ModelDrivesAndScores");
           params_storage.remove("ModelDrivesAndScores");
-          updateModelLabels();
+          updateModelLabels(list);
         }
       });
       modelToggle = resetScoresBtn;
@@ -215,7 +221,7 @@ FrogPilotModelPanel::FrogPilotModelPanel(FrogPilotSettingsWindow *parent) : Frog
       modelToggle = new ParamControl(param, title, desc, icon);
     }
 
-    addItem(modelToggle);
+    list->addItem(modelToggle);
     toggles[param] = modelToggle;
 
     if (FrogPilotParamManageControl *frogPilotManageToggle = qobject_cast<FrogPilotParamManageControl*>(modelToggle)) {
@@ -281,7 +287,9 @@ void FrogPilotModelPanel::showEvent(QShowEvent *event) {
 }
 
 void FrogPilotModelPanel::updateState(const UIState &s) {
-  if (!isVisible() || finalizingDownload) return;
+  if (!isVisible() || finalizingDownload) {
+    return;
+  }
 
   if (allModelsDownloading || modelDownloading) {
     QString progress = QString::fromStdString(params_memory.get("ModelDownloadProgress"));
@@ -327,9 +335,11 @@ void FrogPilotModelPanel::updateState(const UIState &s) {
   downloadModelBtn->setVisibleButton(1, !modelDownloading);
 
   started = s.scene.started;
+
+  parent->keepScreenOn = allModelsDownloading || modelDownloading;
 }
 
-void FrogPilotModelPanel::updateModelLabels() {
+void FrogPilotModelPanel::updateModelLabels(FrogPilotListWidget *list) {
   QString modelDrivesAndScoresJson = QString::fromStdString(params.get("ModelDrivesAndScores"));
   QJsonDocument jsonDoc = QJsonDocument::fromJson(modelDrivesAndScoresJson.toUtf8());
   QJsonObject modelDrivesAndScores = jsonDoc.object();
@@ -351,7 +361,7 @@ void FrogPilotModelPanel::updateModelLabels() {
 
     LabelControl *labelControl = new LabelControl(labelTitle, labelText, "", this);
     labelControls.append(labelControl);
-    addItem(labelControl);
+    list->addItem(labelControl);
   }
 
   for (LabelControl *labels : labelControls) {

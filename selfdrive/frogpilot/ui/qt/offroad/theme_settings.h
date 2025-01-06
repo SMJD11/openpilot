@@ -4,7 +4,7 @@
 
 #include "selfdrive/frogpilot/ui/qt/offroad/frogpilot_settings.h"
 
-class FrogPilotThemesPanel : public FrogPilotListWidget {
+class FrogPilotThemesPanel : public QWidget {
   Q_OBJECT
 
 public:

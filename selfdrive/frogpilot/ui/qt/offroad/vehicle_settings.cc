@@ -3,8 +3,8 @@
 
 #include "selfdrive/frogpilot/ui/qt/offroad/vehicle_settings.h"
 
-QStringList getCarModels(const QString &carMake) {
-  static QMap<QString, QString> makeMap = {
+QStringList getCarNames(const QString &carMake, QMap<QString, QString> &carModels) {
+  static const QMap<QString, QString> makeMap = {
     {"acura", "honda"},
     {"audi", "volkswagen"},
     {"buick", "gm"},
@@ -35,49 +35,60 @@ QStringList getCarModels(const QString &carMake) {
     {"volkswagen", "volkswagen"}
   };
 
-  QStringList names;
+  QStringList carNameList;
+  QSet<QString> uniqueCarNames;
 
-  QFile file(QString("../car/%1/values.py").arg(makeMap.value(carMake, carMake)));
-  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    return names;
+  QFile valuesFile(QString("../car/%1/values.py").arg(makeMap.value(carMake, carMake)));
+  if (!valuesFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    return carNameList;
   }
 
-  QString fileContent = QTextStream(&file).readAll();
-  file.close();
-
-  static QRegularExpression carClassRegex(R"(class CAR\(.*\):\n(\s+.*(\n|$))*)");
-  QRegularExpressionMatch match = carClassRegex.match(fileContent);
-  fileContent = match.captured(0).trimmed();
+  QString fileContent = QTextStream(&valuesFile).readAll();
+  valuesFile.close();
 
   fileContent.remove(QRegularExpression("#[^\n]*"));
-  fileContent.remove(QRegularExpression("footnotes\\s*=\\s*\\[.*?\\]"));
+  fileContent.remove(QRegularExpression("footnotes=\\[[^\\]]*\\],\\s*"));
 
-  static QRegularExpression carModelRegex(R"((\w+)\s*=\s*\w+\s*\(\s*\[([\s\S]*?)\]\s*,)");
-  QRegularExpressionMatchIterator carModelIt = carModelRegex.globalMatch(fileContent);
+  static const QRegularExpression platformRegex(R"((\w+)\s*=\s*\w+\s*\(\s*\[([\s\S]*?)\]\s*,)");
+  QRegularExpressionMatchIterator platformMatches = platformRegex.globalMatch(fileContent);
+  while (platformMatches.hasNext()) {
+    QRegularExpressionMatch platformMatch = platformMatches.next();
+    QString platformName = platformMatch.captured(1);
+    QString platformSection = platformMatch.captured(2);
 
-  while (carModelIt.hasNext()) {
-    static QRegularExpression carDocsRegex("CarDocs\\(\\s*\"([^\"]+)\"[^)]*\\)");
-    QRegularExpressionMatchIterator carDocsIt = carDocsRegex.globalMatch(carModelIt.next().captured(2));
+    static const QRegularExpression carNameRegex("CarDocs\\(\\s*\"([^\"]+)\"[^)]*\\)");
+    QRegularExpressionMatchIterator carNameMatches = carNameRegex.globalMatch(platformSection);
+    while (carNameMatches.hasNext()) {
+      QString carName = carNameMatches.next().captured(1);
 
-    while (carDocsIt.hasNext()) {
-      QString carName = carDocsIt.next().captured(1);
-      if (carName.contains(carMake, Qt::CaseInsensitive)) {
-        names << carName;
+      if (carName.contains(QRegularExpression("^[A-Za-z0-9 \u0160.()-]+$")) && carName.count(" ") >= 1) {
+        QStringList carNameParts = carName.split(" ");
+        if (carNameParts.contains(carMake, Qt::CaseInsensitive) && !uniqueCarNames.contains(carName)) {
+          uniqueCarNames.insert(carName);
+          carNameList << carName;
+          carModels[carName] = platformName;
+        }
       }
     }
   }
 
-  std::sort(names.begin(), names.end());
-  return names;
+  std::sort(carNameList.begin(), carNameList.end());
+  return carNameList;
 }
 
-FrogPilotVehiclesPanel::FrogPilotVehiclesPanel(FrogPilotSettingsWindow *parent) : FrogPilotListWidget(parent), parent(parent) {
+FrogPilotVehiclesPanel::FrogPilotVehiclesPanel(FrogPilotSettingsWindow *parent) : QWidget(parent), parent(parent) {
+  QVBoxLayout *vehiclesLayout = new QVBoxLayout(this);
+  vehiclesLayout->setContentsMargins(50, 25, 50, 25);
+
+  FrogPilotListWidget *list = new FrogPilotListWidget(this);
+  vehiclesLayout->addWidget(list);
+
   QStringList makes = {
-    tr("Acura"), tr("Audi"), tr("Buick"), tr("Cadillac"), tr("Chevrolet"), tr("Chrysler"),
-    tr("CUPRA"), tr("Dodge"), tr("Ford"), tr("Genesis"), tr("GMC"), tr("Holden"), tr("Honda"),
-    tr("Hyundai"), tr("Jeep"), tr("Kia"), tr("Lexus"), tr("Lincoln"), tr("MAN"), tr("Mazda"),
-    tr("Nissan"), tr("Ram"), tr("SEAT"), tr("Škoda"), tr("Subaru"), tr("Tesla"), tr("Toyota"),
-    tr("Volkswagen")
+    "Acura", "Audi", "Buick", "Cadillac", "Chevrolet", "Chrysler",
+    "CUPRA", "Dodge", "Ford", "Genesis", "GMC", "Holden", "Honda",
+    "Hyundai", "Jeep", "Kia", "Lexus", "Lincoln", "MAN", "Mazda",
+    "Nissan", "Ram", "SEAT", "Škoda", "Subaru", "Tesla", "Toyota",
+    "Volkswagen"
   };
   selectMakeButton = new ButtonControl(tr("Select Make"), tr("SELECT"));
   QObject::connect(selectMakeButton, &ButtonControl::clicked, [this, makes]() {
@@ -89,24 +100,24 @@ FrogPilotVehiclesPanel::FrogPilotVehiclesPanel(FrogPilotSettingsWindow *parent) 
       setModels();
     }
   });
-  addItem(selectMakeButton);
+  list->addItem(selectMakeButton);
 
   selectModelButton = new ButtonControl(tr("Select Model"), tr("SELECT"));
   QObject::connect(selectModelButton, &ButtonControl::clicked, [this]() {
-    QString newModelSelection = MultiOptionDialog::getSelection(tr("Select a Model"), carModels, "", this);
+    QString newModelSelection = MultiOptionDialog::getSelection(tr("Select a Model"), models, "", this);
     if (!newModelSelection.isEmpty()) {
       carModel = newModelSelection;
-      QString modelIdentifier = newModelSelection;
+      QString modelIdentifier = carModels.value(newModelSelection);
       params.put("CarModel", modelIdentifier.toStdString());
       params.put("CarModelName", newModelSelection.toStdString());
       selectModelButton->setValue(newModelSelection);
     }
   });
-  addItem(selectModelButton);
+  list->addItem(selectModelButton);
   selectModelButton->setVisible(false);
 
   forceFingerprint = new ParamControl("ForceFingerprint", tr("Disable Automatic Fingerprint Detection"), tr("Forces the selected fingerprint and prevents it from ever changing."), "");
-  addItem(forceFingerprint);
+  list->addItem(forceFingerprint);
 
   bool disableOpenpilotLongState = params.getBool("DisableOpenpilotLongitudinal");
   disableOpenpilotLong = new ToggleControl(tr("Disable openpilot Longitudinal Control"), tr("Disables openpilot longitudinal control and uses the car's stock ACC instead."), "", disableOpenpilotLongState);
@@ -130,7 +141,7 @@ FrogPilotVehiclesPanel::FrogPilotVehiclesPanel(FrogPilotSettingsWindow *parent) 
     }
     parent->updateVariables();
   });
-  addItem(disableOpenpilotLong);
+  list->addItem(disableOpenpilotLong);
 
   std::vector<std::tuple<QString, QString, QString, QString>> vehicleToggles {
     {"VoltSNG", tr("2017 Volt Stop and Go Hack"), tr("Force stop and go for the 2017 Chevy Volt."), ""},
@@ -168,7 +179,7 @@ FrogPilotVehiclesPanel::FrogPilotVehiclesPanel(FrogPilotSettingsWindow *parent) 
       vehicleToggle = new ParamControl(param, title, desc, icon);
     }
 
-    addItem(vehicleToggle);
+    list->addItem(vehicleToggle);
     toggles[param] = vehicleToggle;
 
     QObject::connect(vehicleToggle, &AbstractControl::showDescriptionEvent, [this]() {
@@ -189,11 +200,8 @@ FrogPilotVehiclesPanel::FrogPilotVehiclesPanel(FrogPilotSettingsWindow *parent) 
 
   QObject::connect(uiState(), &UIState::offroadTransition, [this]() {
     std::thread([this]() {
-      while (carMake.isEmpty()) {
-        util::sleep_for(1000);
-        carMake = QString::fromStdString(params.get("CarMake"));
-        carModel = QString::fromStdString(params.get(params.get("CarModelName").empty() ? "CarModel" : "CarModelName"));
-      }
+      carMake = QString::fromStdString(params.get("CarMake", true));
+      carModel = QString::fromStdString(params.get(params.get("CarModelName").empty() ? "CarModel" : "CarModelName"));
       setModels();
     }).detach();
   });
@@ -234,7 +242,7 @@ void FrogPilotVehiclesPanel::updateState(const UIState &s) {
 }
 
 void FrogPilotVehiclesPanel::setModels() {
-  carModels = getCarModels(carMake.toLower());
+  models = getCarNames(carMake.toLower(), carModels);
   updateToggles();
 }
 
@@ -286,7 +294,7 @@ void FrogPilotVehiclesPanel::updateToggles() {
       }
     }
 
-    toggle->setVisible(setVisible && tuningLevel >= frogpilotToggleLevels[key].toDouble());
+    toggle->setVisible(!carMake.isEmpty() && setVisible && tuningLevel >= frogpilotToggleLevels[key].toDouble());
   }
 
   setUpdatesEnabled(true);
