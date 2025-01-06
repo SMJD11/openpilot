@@ -29,6 +29,7 @@ class FrogPilotPlanner:
 
     self.lateral_check = False
     self.model_stopped = False
+    self.road_curvature_detected = False
     self.slower_lead = False
     self.tracking_lead = False
 
@@ -80,6 +81,7 @@ class FrogPilotPlanner:
     self.model_stopped |= self.frogpilot_vcruise.forcing_stop
 
     self.road_curvature = calculate_road_curvature(modelData, v_ego) if not carState.standstill else 1
+    self.road_curvature_detected = (1 / self.road_curvature)**0.5 < v_ego
 
     self.tracking_lead = self.set_lead_status(carState, v_lead)
     self.v_cruise = self.frogpilot_vcruise.update(carControl, carState, controlsState, frogpilotCarControl, frogpilotCarState, frogpilotNavigation, v_cruise, v_ego, frogpilot_toggles)
@@ -92,7 +94,7 @@ class FrogPilotPlanner:
     self.tracking_lead_mac.add_data(following_lead)
     return self.tracking_lead_mac.get_moving_average() >= THRESHOLD
 
-  def publish(self, sm, pm, theme_updated, toggles_updated, frogpilot_toggles):
+  def publish(self, sm, pm, toggles_updated, frogpilot_toggles):
     frogpilot_plan_send = messaging.new_message('frogpilotPlan')
     frogpilot_plan_send.valid = sm.all_checks(service_list=['carState', 'controlsState'])
     frogpilotPlan = frogpilot_plan_send.frogpilotPlan
@@ -136,8 +138,6 @@ class FrogPilotPlanner:
     frogpilotPlan.speedLimitChanged = self.frogpilot_vcruise.speed_limit_changed
     frogpilotPlan.unconfirmedSlcSpeedLimit = self.frogpilot_vcruise.slc.desired_speed_limit
     frogpilotPlan.upcomingSLCSpeedLimit = self.frogpilot_vcruise.slc.upcoming_speed_limit
-
-    frogpilotPlan.themeUpdated = theme_updated
 
     frogpilotPlan.togglesUpdated = toggles_updated
 

@@ -12,6 +12,7 @@ GITHUB_VERSION_URL = f"https://github.com/FrogAi/FrogPilot-Resources/raw/Version
 GITLAB_VERSION_URL = f"https://gitlab.com/FrogAi/FrogPilot-Resources/-/raw/Versions/mapd_version_{VERSION}.json"
 
 MAPD_PATH = Path("/data/media/0/osm/mapd")
+MAPS_PATH = Path("/data/media/0/osm/offline")
 VERSION_PATH = Path("/data/media/0/osm/mapd_version")
 
 def download(current_version):

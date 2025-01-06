@@ -27,7 +27,7 @@ from openpilot.selfdrive.classic_modeld.models.commonmodel_pyx import ModelFrame
 
 from openpilot.selfdrive.frogpilot.frogpilot_variables import DEFAULT_CLASSIC_MODEL, MODELS_PATH, get_frogpilot_toggles
 
-PROCESS_NAME = "selfdrive.classic_modeld.modeld"
+PROCESS_NAME = "selfdrive.classic_modeld.classic_modeld"
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
 
 MODEL_PATHS = {
@@ -55,12 +55,17 @@ class ModelState:
 
   def __init__(self, context: CLContext, frogpilot_toggles: SimpleNamespace):
     # FrogPilot variables
-    self.enable_navigation = not frogpilot_toggles.navigationless_model
+    self.enable_navigation = frogpilot_toggles.navigation_model
     self.radarless = frogpilot_toggles.radarless_model
 
-    model_path = Path(__file__).parent / f'{MODELS_PATH}/{frogpilot_toggles.model}.thneed'
+    model_path = MODELS_PATH / f'{frogpilot_toggles.model}.thneed'
     if frogpilot_toggles.model != DEFAULT_CLASSIC_MODEL and model_path.exists():
       MODEL_PATHS[ModelRunner.THNEED] = model_path
+
+    metadata_path = METADATA_PATH
+    desired_metadata_path = MODELS_PATH / f'supercombo_metadata_{frogpilot_toggles.model_version}.pkl'
+    if frogpilot_toggles.model != DEFAULT_CLASSIC_MODEL and desired_metadata_path.exists():
+      metadata_path = desired_metadata_path
 
     self.frame = ModelFrame(context)
     self.wide_frame = ModelFrame(context)
@@ -76,7 +81,7 @@ class ModelState:
       **({'radar_tracks': np.zeros(ModelConstants.RADAR_TRACKS_LEN * ModelConstants.RADAR_TRACKS_WIDTH, dtype=np.float32)} if self.radarless else {}),
     }
 
-    with open(METADATA_PATH, 'rb') as f:
+    with open(metadata_path, 'rb') as f:
       model_metadata = pickle.load(f)
 
     self.output_slices = model_metadata['output_slices']
@@ -136,7 +141,7 @@ def main(demo=False):
   # FrogPilot variables
   frogpilot_toggles = get_frogpilot_toggles()
 
-  enable_navigation = not frogpilot_toggles.navigationless_model
+  enable_navigation = frogpilot_toggles.navigation_model
   radarless = frogpilot_toggles.radarless_model
 
   cloudlog.warning("classic_modeld init")

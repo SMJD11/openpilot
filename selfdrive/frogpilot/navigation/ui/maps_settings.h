@@ -72,6 +72,7 @@ private:
   bool countriesOpen;
   bool downloadActive;
   bool hasMapsSelected;
+  bool mapdExists;
 
   qint64 startTime;
 

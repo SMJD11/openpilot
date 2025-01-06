@@ -65,6 +65,19 @@ FrogPilotLateralPanel::FrogPilotLateralPanel(FrogPilotSettingsWindow *parent) : 
           modifiedAdvancedLateralTuneKeys.erase("SteerLatAccel");
         }
 
+        if (params.getFloat("SteerFrictionStock") == 0) {
+          modifiedAdvancedLateralTuneKeys.erase("SteerFriction");
+        }
+        if (params.getFloat("SteerKPStock") == 0) {
+          modifiedAdvancedLateralTuneKeys.erase("SteerKP");
+        }
+        if (params.getFloat("SteerLatAccelStock") == 0) {
+          modifiedAdvancedLateralTuneKeys.erase("SteerLatAccel");
+        }
+        if (params.getFloat("SteerRatioStock") == 0) {
+          modifiedAdvancedLateralTuneKeys.erase("SteerRatio");
+        }
+
         showToggles(modifiedAdvancedLateralTuneKeys);
       });
       lateralToggle = advancedLateralTuneToggle;

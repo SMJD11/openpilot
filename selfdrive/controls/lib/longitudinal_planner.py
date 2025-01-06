@@ -203,7 +203,7 @@ class LongitudinalPlanner:
       throttle_prob = 1.0
     return x, v, a, j, throttle_prob
 
-  def update(self, classic_model, radarless_model, sm, frogpilot_toggles):
+  def update(self, radarless_model, sm, frogpilot_toggles):
     self.mpc.mode = 'blended' if sm['controlsState'].experimentalMode else 'acc'
 
     if len(sm['carControl'].orientationNED) == 3:
@@ -247,7 +247,7 @@ class LongitudinalPlanner:
     # Don't clip at low speeds since throttle_prob doesn't account for creep
     self.allow_throttle = throttle_prob > ALLOW_THROTTLE_THRESHOLD or v_ego <= MIN_ALLOW_THROTTLE_SPEED
 
-    if not self.allow_throttle and not classic_model:
+    if not self.allow_throttle:
       clipped_accel_coast = max(accel_coast, accel_limits_turns[0])
       clipped_accel_coast_interp = interp(v_ego, [MIN_ALLOW_THROTTLE_SPEED, MIN_ALLOW_THROTTLE_SPEED*2], [accel_limits_turns[1], clipped_accel_coast])
       accel_limits_turns[1] = min(accel_limits_turns[1], clipped_accel_coast_interp)

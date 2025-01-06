@@ -60,6 +60,7 @@ class ConditionalExperimentalMode:
     if self.frogpilot_planner.frogpilot_vcruise.slc.experimental_mode:
       self.status_value = 17
       return True
+
     return False
 
   def update_conditions(self, frogpilotCarState, tracking_lead, v_ego, v_lead, frogpilot_toggles):
@@ -69,10 +70,9 @@ class ConditionalExperimentalMode:
 
   def curve_detection(self, tracking_lead, v_ego, frogpilot_toggles):
     if v_ego > CRUISING_SPEED:
-      curve_detected = (1 / self.frogpilot_planner.road_curvature)**0.5 < v_ego
-      curve_active = (0.9 / self.frogpilot_planner.road_curvature)**0.5 < v_ego and self.curve_detected
+      curve_active = self.curve_detected and (0.9 / self.frogpilot_planner.road_curvature)**0.5 < v_ego
 
-      self.curvature_mac.add_data(curve_detected or curve_active)
+      self.curvature_mac.add_data(self.frogpilot_planner.road_curvature_detected or curve_active)
       self.curve_detected = self.curvature_mac.get_moving_average() >= THRESHOLD
     else:
       self.curvature_mac.reset_data()

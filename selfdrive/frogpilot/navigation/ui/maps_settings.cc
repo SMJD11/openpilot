@@ -110,12 +110,18 @@ void FrogPilotMapsPanel::showEvent(QShowEvent *event) {
   mapsSelected = params.get("MapsSelected");
   hasMapsSelected = !QJsonDocument::fromJson(QByteArray::fromStdString(mapsSelected)).object().value("nations").toArray().isEmpty();
   hasMapsSelected |= !QJsonDocument::fromJson(QByteArray::fromStdString(mapsSelected)).object().value("states").toArray().isEmpty();
+
+  std::thread([this] {
+    mapsSize->setText(calculateDirectorySize(mapsFolderPath));
+  }).detach();
 }
 
 void FrogPilotMapsPanel::hideEvent(QHideEvent *event) {
   displayMapButtons(false);
 
   countriesOpen = false;
+
+  mapdExists = std::filesystem::exists("/data/media/0/osm/mapd");
 }
 
 void FrogPilotMapsPanel::updateState(const UIState &s) {
@@ -123,11 +129,11 @@ void FrogPilotMapsPanel::updateState(const UIState &s) {
     return;
   }
 
-  if (downloadActive) {
+  if (downloadActive && s.sm->frame % (UI_FREQ / 2) == 0) {
     updateDownloadStatusLabels();
   }
 
-  downloadMapsButton->setEnabled(hasMapsSelected && s.scene.online);
+  downloadMapsButton->setEnabled(mapdExists && hasMapsSelected && s.scene.online);
 }
 
 void FrogPilotMapsPanel::cancelDownload() {

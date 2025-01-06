@@ -23,10 +23,12 @@ private:
 
   QJsonObject frogpilotToggleLevels;
 
+  QMap<QString, QString> carModels;
+
   QString carMake;
   QString carModel;
 
-  QStringList carModels;
+  QStringList models;
 
   ParamControl *forceFingerprint;
 

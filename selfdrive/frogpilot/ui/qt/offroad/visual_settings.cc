@@ -91,7 +91,13 @@ FrogPilotVisualsPanel::FrogPilotVisualsPanel(FrogPilotSettingsWindow *parent) : 
     } else if (param == "DeveloperUI") {
       FrogPilotParamManageControl *developerUIToggle = new FrogPilotParamManageControl(param, title, desc, icon);
       QObject::connect(developerUIToggle, &FrogPilotParamManageControl::manageButtonClicked, [this]() {
-        showToggles(developerUIKeys);
+        std::set<QString> modifiedDeveloperUIKeys = developerUIKeys;
+
+        if (!hasOpenpilotLongitudinal) {
+          modifiedDeveloperUIKeys.erase("DeveloperWidgets");
+        }
+
+        showToggles(modifiedDeveloperUIKeys);
       });
       visualToggle = developerUIToggle;
     } else if (param == "DeveloperMetrics") {
@@ -165,7 +171,12 @@ FrogPilotVisualsPanel::FrogPilotVisualsPanel(FrogPilotSettingsWindow *parent) : 
         std::set<QString> modifiedDeveloperWidgetKeys = developerWidgetKeys;
 
         if (!hasOpenpilotLongitudinal) {
+          modifiedDeveloperWidgetKeys.erase("ShowCEMStatus");
           modifiedDeveloperWidgetKeys.erase("ShowStoppingPoint");
+        }
+
+        if (!params.getBool("ConditionalExperimentalMode")) {
+          modifiedDeveloperWidgetKeys.erase("ShowCEMStatus");
         }
 
         showToggles(modifiedDeveloperWidgetKeys);

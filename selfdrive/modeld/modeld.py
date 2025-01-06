@@ -58,15 +58,14 @@ class ModelState:
     # FrogPilot variables
     self.use_desired_curvature = frogpilot_toggles.desired_curvature_model
 
-    model_path = Path(__file__).parent / f'{MODELS_PATH}/{frogpilot_toggles.model}.thneed'
+    model_path = MODELS_PATH / f'{frogpilot_toggles.model}.thneed'
     if frogpilot_toggles.model != DEFAULT_MODEL and model_path.exists():
       MODEL_PATHS[ModelRunner.THNEED] = model_path
 
     metadata_path = METADATA_PATH
-    if self.use_desired_curvature:
-      desired_metadata_path = Path(__file__).parent / 'models/desired_curvature_supercombo_metadata.pkl'
-      if desired_metadata_path.exists():
-        metadata_path = desired_metadata_path
+    desired_metadata_path = MODELS_PATH / f'supercombo_metadata_{frogpilot_toggles.model_version}.pkl'
+    if frogpilot_toggles.model != DEFAULT_MODEL and desired_metadata_path.exists():
+      metadata_path = desired_metadata_path
 
     self.frame = ModelFrame(context)
     self.wide_frame = ModelFrame(context)
@@ -314,8 +313,10 @@ def main(demo=False):
       DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob, sm['frogpilotPlan'], frogpilot_toggles)
       modelv2_send.modelV2.meta.laneChangeState = DH.lane_change_state
       modelv2_send.modelV2.meta.laneChangeDirection = DH.lane_change_direction
+      modelv2_send.modelV2.meta.turnDirection = DH.turn_direction
       drivingdata_send.drivingModelData.meta.laneChangeState = DH.lane_change_state
       drivingdata_send.drivingModelData.meta.laneChangeDirection = DH.lane_change_direction
+      drivingdata_send.drivingModelData.meta.turnDirection = DH.turn_direction
 
       fill_pose_msg(posenet_send, model_output, meta_main.frame_id, vipc_dropped_frames, meta_main.timestamp_eof, live_calib_seen)
       pm.send('modelV2', modelv2_send)
