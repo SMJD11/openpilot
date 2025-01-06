@@ -381,6 +381,7 @@ class FrogPilotVariables:
     tuning_level = params.get_int("TuningLevel") if params.get_bool("TuningLevelConfirmed") else 3
 
     allow_far_lead_tracking = self.testing_branch and tuning_level >= 3 or self.frogpilot_toggles.frogs_go_moo
+    allow_frankenfrog = self.testing_branch and tuning_level >= 3 or self.frogpilot_toggles.frogs_go_moo
 
     default = params_default
     level = self.tuning_levels
@@ -584,27 +585,38 @@ class FrogPilotVariables:
     toggle.max_desired_acceleration = clip(params.get_float("MaxDesiredAcceleration"), 0.1, 4.0) if longitudinal_tuning and tuning_level >= level["MaxDesiredAcceleration"] else default.get_float("MaxDesiredAcceleration")
     toggle.taco_tune = longitudinal_tuning and (params.get_bool("TacoTune") if tuning_level >= level["TacoTune"] else default.get_bool("TacoTune"))
 
-    available_models = params.get("AvailableModels", encoding='utf-8')
-    available_model_names = params.get("AvailableModelNames", encoding='utf-8')
+    toggle.available_models = params.get("AvailableModels", encoding='utf-8')
+    toggle.available_model_names = params.get("AvailableModelNames", encoding='utf-8')
     toggle.model_randomizer = params.get_bool("ModelRandomizer") if tuning_level >= level["ModelRandomizer"] else default.get_bool("ModelRandomizer")
-    if available_models:
+    if toggle.available_models:
       if toggle.model_randomizer:
         if not started:
           blacklisted_models = (params.get("BlacklistedModels", encoding='utf-8') or "").split(",")
-          existing_models = [model for model in available_models.split(",") if model not in blacklisted_models and (MODELS_PATH / f"{model}.thneed").exists()]
+          if not allow_frankenfrog:
+            blacklisted_models += ["frankenfrog"]
+          existing_models = [model for model in toggle.available_models.split(",") if model not in blacklisted_models and (model == "frankenfrog" or (MODELS_PATH / f"{model}.thneed").exists())]
           toggle.model = random.choice(existing_models) if existing_models else default.get("Model", encoding='utf-8')
       else:
         toggle.model = params.get("Model", encoding='utf-8') if tuning_level >= level["Model"] else default.get("Model", encoding='utf-8')
     else:
       toggle.model = default.get("Model", encoding='utf-8')
-    if available_models and available_model_names and toggle.model in available_models.split(",") and (MODELS_PATH / f"{toggle.model}.thneed").exists():
-      toggle.model_name = available_model_names.split(",")[available_models.split(",").index(toggle.model)]
+    if toggle.available_models and toggle.available_model_names and toggle.model in toggle.available_models.split(",") and (toggle.model == "frankenfrog" or (MODELS_PATH / f"{toggle.model}.thneed").exists()):
+      toggle.model_name = toggle.available_model_names.split(",")[toggle.available_models.split(",").index(toggle.model)]
     else:
       toggle.model = default.get("Model", encoding='utf-8')
       toggle.model_name = default.get("ModelName", encoding='utf-8')
-    model_versions = params.get("ModelVersions", encoding='utf-8')
-    if available_models and model_versions:
-      toggle.model_version = model_versions.split(",")[available_models.split(",").index(toggle.model)]
+    if toggle.model == "frankenfrog":
+      if allow_frankenfrog:
+        toggle.frogpilot_model = True
+      else:
+        toggle.frogpilot_model = False
+        toggle.model = default.get("Model", encoding='utf-8')
+        toggle.model_name = default.get("ModelName", encoding='utf-8')
+    else:
+      toggle.frogpilot_model = False
+    toggle.model_versions = params.get("ModelVersions", encoding='utf-8')
+    if toggle.available_models and toggle.model_versions:
+      toggle.model_version = toggle.model_versions.split(",")[toggle.available_models.split(",").index(toggle.model)]
       if not (MODELS_PATH / f"supercombo_metadata_{toggle.model_version}.pkl").exists():
         toggle.model = default.get("Model", encoding='utf-8')
         toggle.model_name = default.get("ModelName", encoding='utf-8')

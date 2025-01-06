@@ -158,6 +158,7 @@ FrogPilotModelPanel::FrogPilotModelPanel(FrogPilotSettingsWindow *parent) : QWid
             for (const QString &file : modelDir.entryList(QDir::Files)) {
               downloadableModels.removeAll(modelFileToNameMap.value(QFileInfo(file).baseName()));
             }
+            downloadableModels.removeAll("Frankenfrog 👀📡");
 
             QString modelToDownload = MultiOptionDialog::getSelection(tr("Select a driving model to download"), downloadableModels, "", this);
             if (!modelToDownload.isEmpty()) {
@@ -199,6 +200,8 @@ FrogPilotModelPanel::FrogPilotModelPanel(FrogPilotSettingsWindow *parent) : QWid
             selectableModels.append(modelName);
           }
         }
+        selectableModels.append("Frankenfrog 👀📡");
+        selectableModels.sort();
         selectableModels.prepend(QString::fromStdString(params_default.get("ModelName")));
 
         QString modelToSelect = MultiOptionDialog::getSelection(tr("Select a model - 🗺️ = Navigation | 📡 = Radar | 👀 = VOACC"), selectableModels, QString::fromStdString(params.get("ModelName")), this);
@@ -270,6 +273,7 @@ void FrogPilotModelPanel::showEvent(QShowEvent *event) {
   for (const QString &file : modelDir.entryList(QDir::Files)) {
     downloadableModels.removeAll(modelFileToNameMap.value(QFileInfo(file).baseName()));
   }
+  downloadableModels.removeAll("Frankenfrog 👀📡");
   allModelsDownloaded = downloadableModels.isEmpty();
 
   QStringList deletableModels;
