@@ -175,7 +175,6 @@ typedef struct UIScene {
   bool keep_screen_on;
   bool lateral_tuning_metrics;
   bool lead_metrics;
-  bool left_curve;
   bool live_valid;
   bool map_open;
   bool memory_metrics;

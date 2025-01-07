@@ -1058,7 +1058,7 @@ void AnnotatedCameraWidget::updateFrogPilotVariables(int alert_height, const UIS
 
   leadInfo = scene.lead_metrics;
 
-  leftCurve = scene.left_curve;
+  leftCurve = scene.steering_angle_deg < 0;
 
   mapOpen = scene.map_open;
   bigMapOpen = mapOpen && scene.big_map;
