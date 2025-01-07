@@ -267,7 +267,7 @@ class CarController(CarControllerBase):
 
         # internal PCM gas command can get stuck unwinding from negative accel so we apply a generous rate limit
         pcm_accel_cmd = actuators.accel
-        if CC.longActive:
+        if CC.longActive and not frogpilot_toggles.frogsgomoo_tweak:
           pcm_accel_cmd = rate_limit(pcm_accel_cmd, self.prev_accel, ACCEL_WINDDOWN_LIMIT, ACCEL_WINDUP_LIMIT)
         self.prev_accel = pcm_accel_cmd
 
@@ -294,9 +294,10 @@ class CarController(CarControllerBase):
           self.prev_error = error
 
           error_future = pcm_accel_cmd - a_ego_future
-          pcm_accel_cmd = self.long_pid.update(error_future, error_rate=self.error_rate.x,
-                                               speed=CS.out.vEgo,
-                                               feedforward=pcm_accel_cmd)
+          if not frogpilot_toggles.frogsgomoo_tweak:
+            pcm_accel_cmd = self.long_pid.update(error_future, error_rate=self.error_rate.x,
+                                                 speed=CS.out.vEgo,
+                                                 feedforward=pcm_accel_cmd)
         else:
           self.long_pid.reset()
           self.error_rate.x = 0.0
