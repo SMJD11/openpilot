@@ -189,10 +189,8 @@ void FrogPilotSettingsWindow::showEvent(QShowEvent *event) {
 }
 
 void FrogPilotSettingsWindow::closePanel() {
-  QSize frogpilotWidgetSize = frogpilotWidget->sizeHint();
-  this->setMinimumSize(frogpilotWidgetSize);
-  this->resize(frogpilotWidgetSize);
   mainLayout->setCurrentWidget(frogpilotWidget);
+  this->resize(frogpilotWidget->sizeHint());
   panelOpen = false;
   updateFrogPilotToggles();
 }
