@@ -7,6 +7,7 @@ from openpilot.selfdrive.frogpilot.frogpilot_variables import TO_RADIANS, params
 class SpeedLimitController:
   def __init__(self):
     self.experimental_mode = False
+    self.speed_limit_changed = False
 
     self.desired_speed_limit = 0
     self.map_speed_limit = 0
@@ -31,8 +32,10 @@ class SpeedLimitController:
       if abs(self.speed_limit - self.previous_speed_limit) > 1:
         params.put_float_nonblocking("PreviousSpeedLimit", self.speed_limit)
         self.previous_speed_limit = self.speed_limit
+        self.speed_limit_changed = True
       return self.speed_limit
     else:
+      self.speed_limit_changed = False
       return 0
 
   def update_map_speed_limit(self, v_ego, frogpilot_toggles):

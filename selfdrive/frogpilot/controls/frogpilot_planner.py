@@ -135,7 +135,7 @@ class FrogPilotPlanner:
     frogpilotPlan.slcSpeedLimit = self.frogpilot_vcruise.slc_target
     frogpilotPlan.slcSpeedLimitOffset = self.frogpilot_vcruise.slc_offset
     frogpilotPlan.slcSpeedLimitSource = self.frogpilot_vcruise.slc.source
-    frogpilotPlan.speedLimitChanged = self.frogpilot_vcruise.speed_limit_changed
+    frogpilotPlan.speedLimitChanged = self.frogpilot_vcruise.slc.speed_limit_changed
     frogpilotPlan.unconfirmedSlcSpeedLimit = self.frogpilot_vcruise.slc.desired_speed_limit
     frogpilotPlan.upcomingSLCSpeedLimit = self.frogpilot_vcruise.slc.upcoming_speed_limit
 
