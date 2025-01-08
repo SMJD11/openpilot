@@ -24,7 +24,7 @@ NON_DRIVING_GEARS = [GearShifter.neutral, GearShifter.park, GearShifter.reverse,
 
 CITY_SPEED_LIMIT = 25                                   # 55mph is typically the minimum speed for highways
 CRUISING_SPEED = 5                                      # Roughly the speed cars go when not touching the gas while in drive
-LANE_WIDTH = 3                                          # Roughly the average lane width
+LANE_WIDTH = 3.2                                        # Roughly the average lane width
 MODEL_LENGTH = ModelConstants.IDX_N                     # Minimum length of the model
 PLANNER_TIME = ModelConstants.T_IDXS[MODEL_LENGTH - 1]  # Length of time the model projects out for
 THRESHOLD = 0.63                                        # Requires the condition to be true for ~1 second
