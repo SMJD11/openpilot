@@ -369,6 +369,7 @@ class FrogPilotVariables:
         car_model = CP.carFingerprint
         has_auto_tune = car_make in {"hyundai", "toyota"} and CP.lateralTuning.which == "torque"
         has_bsm = CP.enableBsm
+        has_pedal = CP.enableGasInterceptor
         has_radar = not CP.radarUnavailable
         is_pid_car = CP.lateralTuning.which == "pid"
         max_acceleration_enabled = CP.alternativeExperience & ALTERNATIVE_EXPERIENCE.RAISE_LONGITUDINAL_LIMITS_TO_ISO_MAX
@@ -380,6 +381,7 @@ class FrogPilotVariables:
       car_model = "mock"
       has_auto_tune = False
       has_bsm = False
+      has_pedal = False
       has_radar = False
       is_pid_car = False
       max_acceleration_enabled = False
@@ -659,6 +661,7 @@ class FrogPilotVariables:
 
     toggle.old_long_api = openpilot_longitudinal and car_make == "gm" and not (params.get_bool("NewLongAPIGM") if tuning_level >= level["NewLongAPIGM"] else default.get_bool("NewLongAPIGM"))
     toggle.old_long_api |= openpilot_longitudinal and car_make == "hyundai" and not (params.get_bool("NewLongAPI") if tuning_level >= level["NewLongAPI"] else default.get_bool("NewLongAPI"))
+    toggle.old_long_api |= openpilot_longitudinal and car_make == "toyota" and has_pedal
 
     personalize_openpilot = params.get_bool("PersonalizeOpenpilot") if tuning_level >= level["PersonalizeOpenpilot"] else default.get_bool("PersonalizeOpenpilot")
     toggle.color_scheme = toggle.current_holiday_theme if toggle.current_holiday_theme != "stock" else params.get("CustomColors", encoding='utf-8') if personalize_openpilot else "stock"
