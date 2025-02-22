@@ -1,8 +1,5 @@
-#!/usr/bin/env python3
-from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.common.realtime import DT_MDL
-
-from openpilot.selfdrive.frogpilot.frogpilot_variables import CITY_SPEED_LIMIT, CRUISING_SPEED, THRESHOLD, params_memory
+from openpilot.selfdrive.frogpilot.frogpilot_utilities import MovingAverageCalculator
+from openpilot.selfdrive.frogpilot.frogpilot_variables import CITY_SPEED_LIMIT, CRUISING_SPEED, QUERY_RADIUS, THRESHOLD, params_memory
 
 class ConditionalExperimentalMode:
   def __init__(self, FrogPilotPlanner):
@@ -61,16 +58,21 @@ class ConditionalExperimentalMode:
       self.status_value = 15 if not self.frogpilot_planner.frogpilot_vcruise.forcing_stop else 16
       return True
 
+    if self.stop_sign_ahead(v_ego, frogpilot_toggles): # ADD NEW STOP SIGN CONDITION CHECK
+      self.status_value = 18 # New status value for stop sign experimental mode
+      return True
+
     if self.frogpilot_planner.frogpilot_vcruise.slc.experimental_mode:
       self.status_value = 17
       return True
 
     return False
 
-  def update_conditions(self, frogpilotCarState, v_ego, v_lead, frogpilot_toggles):
-    self.curve_detection(v_ego, frogpilot_toggles)
-    self.slow_lead(v_lead, frogpilot_toggles)
-    self.stop_sign_and_light(frogpilotCarState, v_ego, frogpilot_toggles)
+  def update_conditions(self, frogpilotCarState, tracking_lead, v_ego, v_lead, frogpilot_toggles):
+    self.curve_detection(tracking_lead, v_ego, frogpilot_toggles)
+    self.slow_lead(tracking_lead, v_lead, frogpilot_toggles)
+    self.stop_sign_and_light(frogpilotCarState, tracking_lead, v_ego, frogpilot_toggles)
+    self.next_stop_sign_detection(v_ego, frogpilot_toggles) # ADD CALL TO NEW METHOD
 
   def curve_detection(self, v_ego, frogpilot_toggles):
     curve_active = self.curve_detected and (0.9 / self.frogpilot_planner.road_curvature)**0.5 < v_ego
@@ -98,3 +100,16 @@ class ConditionalExperimentalMode:
     else:
       self.stop_light_filter.x = 0
       self.stop_light_detected = False
+
+
+  def next_stop_sign_detection(self, v_ego, frogpilot_toggles): # NEW METHOD for stop sign detection from mapd
+    self.next_stop_sign = json.loads(params_memory.get("NextMapStopSigns") or "{}") # Read NEXT_MAP_STOP_SIGNS
+
+  def stop_sign_ahead(self, v_ego, frogpilot_toggles): # NEW METHOD to check for stop sign ahead
+    if self.next_stop_sign: # Check if next_map_stop_sign is not empty (stop sign data available)
+      distance_to_stop_sign = self.next_stop_sign.get("distance", 0) # Get distance from JSON, default to 0 if "distance" field is missing
+
+      if 0 < distance_to_stop_sign <= 200: # Check if distance is within 200 meters and greater than 0 (to avoid issues if distance is 0 or negative)
+        return True # Return True to engage experimental mode for stop sign
+
+    return False # Return False if no stop sign detected within 200 meters
