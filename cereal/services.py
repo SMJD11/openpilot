@@ -34,7 +34,6 @@ _services: dict[str, tuple] = {
   "errorLogMessage": (True, 0., 1),
   "liveCalibration": (True, 4., 4),
   "liveTorqueParameters": (True, 4., 1),
-  "liveDelay": (True, 4., 1),
   "androidLog": (True, 0.),
   "carState": (True, 100., 10),
   "carControl": (True, 100., 10),
@@ -48,8 +47,7 @@ _services: dict[str, tuple] = {
   "gnssMeasurements": (True, 10., 10),
   "clocks": (True, 0.1, 1),
   "ubloxRaw": (True, 20.),
-  "livePose": (True, 20., 4),
-  "liveLocationKalman": (True, 20.),
+  "liveLocationKalman": (True, 20., 5),
   "liveParameters": (True, 20., 5),
   "cameraOdometry": (True, 20., 5),
   "thumbnail": (True, 0.2, 1),
@@ -94,7 +92,6 @@ _services: dict[str, tuple] = {
   "customReservedRawData2": (True, 0.),
 
   # FrogPilot
-  "frogpilotCarParams": (True, 0.02, 1),
   "frogpilotCarState": (True, 100., 10),
   "frogpilotDeviceState": (True, 2., 1),
   "frogpilotNavigation": (True, 1., 10),

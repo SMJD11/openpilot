@@ -14,8 +14,8 @@ STANDSTILL_THRESHOLD = 10 * 0.0311 * CV.KPH_TO_MS
 
 
 class CarState(CarStateBase):
-  def __init__(self, CP, FPCP):
-    super().__init__(CP, FPCP)
+  def __init__(self, CP):
+    super().__init__(CP)
     can_define = CANDefine(DBC[CP.carFingerprint]["pt"])
     self.shifter_values = can_define.dv["ECMPRDNL2"]["PRNDL2"]
     self.cluster_speed_hyst_gap = CV.KPH_TO_MS / 2.
@@ -183,7 +183,7 @@ class CarState(CarStateBase):
     return ret, fp_ret
 
   @staticmethod
-  def get_cam_can_parser(CP, FPCP):
+  def get_cam_can_parser(CP):
     messages = []
     if CP.networkLocation == NetworkLocation.fwdCamera and not CP.flags & GMFlags.NO_CAMERA.value:
       messages += [
@@ -210,7 +210,7 @@ class CarState(CarStateBase):
     return CANParser(DBC[CP.carFingerprint]["pt"], messages, CanBus.CAMERA)
 
   @staticmethod
-  def get_can_parser(CP, FPCP):
+  def get_can_parser(CP):
     messages = [
       ("PSCMStatus", 10),
       ("ESPStatus", 10),

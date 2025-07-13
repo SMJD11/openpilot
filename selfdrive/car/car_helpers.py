@@ -180,12 +180,12 @@ def fingerprint(logcan, sendcan, num_pandas):
   return car_fingerprint, finger, vin, car_fw, source, exact_match
 
 
-def get_car_interface(CP, FPCP):
+def get_car_interface(CP):
   CarInterface, CarController, CarState = interfaces[CP.carFingerprint]
-  return CarInterface(CP, FPCP, CarController, CarState)
+  return CarInterface(CP, CarController, CarState)
 
 
-def get_car(logcan, sendcan, experimental_long_allowed, params, num_pandas=1, frogpilot_toggles=None):
+def get_car(logcan, sendcan, disable_openpilot_long, experimental_long_allowed, params, num_pandas=1, frogpilot_toggles=None):
   candidate, fingerprints, vin, car_fw, source, exact_match = fingerprint(logcan, sendcan, num_pandas)
 
   if candidate is None or frogpilot_toggles.force_fingerprint:
@@ -202,14 +202,13 @@ def get_car(logcan, sendcan, experimental_long_allowed, params, num_pandas=1, fr
     candidate = "MOCK"
 
   CarInterface, _, _ = interfaces[candidate]
-  CP = CarInterface.get_params(candidate, fingerprints, car_fw, experimental_long_allowed, frogpilot_toggles, docs=False)
-  FPCP = CarInterface.get_frogpilot_params(candidate, car_fw, fingerprints, frogpilot_toggles)
+  CP = CarInterface.get_params(candidate, fingerprints, car_fw, disable_openpilot_long, experimental_long_allowed, params, docs=False)
   CP.carVin = vin
   CP.carFw = car_fw
   CP.fingerprintSource = source
   CP.fuzzyFingerprint = not exact_match
 
-  return get_car_interface(CP, FPCP), CP, FPCP
+  return get_car_interface(CP), CP
 
 def write_car_param(platform=MOCK.MOCK):
   params = Params()

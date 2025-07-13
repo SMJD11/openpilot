@@ -80,8 +80,8 @@ jobs:
         with:
           ref: ${{ needs.get_branch.outputs.branch }}
           sparse-checkout: |
-            frogpilot/ui/
             selfdrive/controls/lib/alerts_offroad.json
+            selfdrive/frogpilot/ui/
             selfdrive/ui/
             selfdrive/ui/update_translations.py
             selfdrive/ui/translations/
@@ -101,12 +101,8 @@ jobs:
       - name: Update Translations
         run: python selfdrive/ui/update_translations.py --vanish
 
-      - name: Update Missing Translations
-        run: python selfdrive/ui/translations/auto_translate.py --all-files
-
-      - name: Vet Existing Translations
-        if: github.event.inputs.vet_existing_translations == 'true'
-        run: python selfdrive/ui/translations/auto_translate.py --all-files --vet-translations
+      - name: Translate Missing or Outdated Translations
+        run: python selfdrive/ui/translations/auto_translate.py --all-files $([[ "${{ github.event.inputs.vet_existing_translations }}" == "true" ]] && echo "--vet-translations")
 
       - name: Commit and Push Translation Updates
         run: |
@@ -146,7 +142,8 @@ jobs:
 
           if [ "${{ github.event.inputs.update_translations }}" = "true" ]; then
             git fetch origin ${{ needs.get_branch.outputs.branch }}
-            git reset --hard FETCH_HEAD
+            git reset --hard origin/${{ needs.get_branch.outputs.branch }}
+            git pull origin ${{ needs.get_branch.outputs.branch }}
           fi
 
       - name: Take Ownership of Build

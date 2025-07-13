@@ -8,8 +8,8 @@ from openpilot.selfdrive.car.volkswagen.values import DBC, CANBUS, NetworkLocati
 
 
 class CarState(CarStateBase):
-  def __init__(self, CP, FPCP):
-    super().__init__(CP, FPCP)
+  def __init__(self, CP):
+    super().__init__(CP)
     self.frame = 0
     self.eps_init_complete = False
     self.CCP = CarControllerParams(CP)
@@ -277,7 +277,7 @@ class CarState(CarStateBase):
     return temp_fault, perm_fault
 
   @staticmethod
-  def get_can_parser(CP, FPCP):
+  def get_can_parser(CP):
     if CP.flags & VolkswagenFlags.PQ:
       return CarState.get_can_parser_pq(CP)
 
@@ -314,7 +314,7 @@ class CarState(CarStateBase):
     return CANParser(DBC[CP.carFingerprint]["pt"], messages, CANBUS.pt)
 
   @staticmethod
-  def get_cam_can_parser(CP, FPCP):
+  def get_cam_can_parser(CP):
     if CP.flags & VolkswagenFlags.PQ:
       return CarState.get_cam_can_parser_pq(CP)
 

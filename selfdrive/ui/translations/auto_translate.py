@@ -1,61 +1,29 @@
 #!/usr/bin/env python3
-
 import argparse
 import json
 import os
 import pathlib
-import xml.etree.ElementTree as ET
-from typing import cast
-
 import requests
+import xml.etree.ElementTree as ET
+
+from typing import cast
 
 TRANSLATIONS_DIR = pathlib.Path(__file__).resolve().parent
 TRANSLATIONS_LANGUAGES = TRANSLATIONS_DIR / "languages.json"
 
 OPENAI_MODEL = "gpt-4o"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+OPENAI_PROMPT = "You are a professional translator from English to {language} (ISO 639 language code). " + \
+                "The following sentence or word is in the GUI of a software called openpilot, translate it accordingly."
 
-BASE_FUN_PROMPT_TEMPLATE = """
-You are a meticulous text stylist. Your task is to rewrite English text while following these strict rules:
+FUN_LANGUAGES = {"duck", "frog", "pirate"}
+FUN_PROMPT = "Your task is to playfully reword the English text using a clever, light-touch '{language}' theme. " + \
+             "Lean into in-character expressions, gentle slang, or subtle stylistic flourishes that evoke the theme, while keeping everything readable and user-friendly. " + \
+             "Think Facebook's Pirate mode — not in terms of *what* it says, but *how* it adds personality without breaking clarity. " + \
+             "Do not rename features, alter technical terms, or change any units of measurement (e.g. km/h, mph, m/s², %, volts). " + \
+             "Only rewrite plain English phrases and labels; symbols, units, and structured strings must be left untouched. " + \
+             "Keep the flair subtle — enough to be fun, but not over the top."
 
-1.  **Clarity is Paramount**: The absolute highest priority is preserving the original meaning. The rewritten text MUST be perfectly and instantly understandable to an English speaker. If a choice exists between style and clarity, ALWAYS choose clarity.
-2.  **Conserve Length**: The rewritten text must be very close in character count to the original. Do not add unnecessary words, sentences, or flavor text that significantly increase the length. Be concise.
-3.  **Preserve Technical Elements**: NEVER translate or alter the following items. They must be kept exactly as they appear in the source text, verbatim:
-    * Placeholders (e.g., %1, %n, {{variable}})
-    * HTML/XML tags (e.g., `<div>`, `<br/>`, `<a>`)
-    * Measurement units and labels (e.g., `10px`, `2.5rem`, `5kg`, `100%`)
-    * File paths and URLs (e.g., `/path/to/file.png`, `https://example.com`)
-    * Code snippets, variable names, or technical jargon.
-    * All original punctuation and capitalization.
-
-With these strict rules in mind, subtly apply the following theme:
-{theme_instructions}
-"""
-
-FUN_THEME_INSTRUCTIONS = {
-  "frog": "Apply a 'frog' theme. You may use words like 'ribbit' or 'hop to it', but ONLY if it can be done without adding length or sacrificing clarity.",
-  "pirate": "Apply a 'pirate' theme. You may use phrases like 'Ahoy, matey' or 'shiver me timbers', but ONLY if it can be done without adding length or sacrificing clarity.",
-  "duck": "Apply a 'duck' theme. You may use words like 'quack' or 'waddle on over', but ONLY if it can be done without adding length or sacrificing clarity."
-}
-
-OPENAI_PROMPT = "You are a meticulous professional translator. " \
-                "Translate everything the user sends from English into {language}. " \
-                "Requirements:\n" \
-                "• Output *only* the translated string—no quotes, no labels, no commentary.\n" \
-                "• Preserve placeholders (e.g. %1, %n, {{variable}}), HTML/XML tags, line-breaks, " \
-                "capitalisation, and punctuation exactly as they appear.\n" \
-                "• If the text is already in {language}, or is code/file-paths/URLs that should not be " \
-                "translated, repeat it verbatim.\n" \
-                "• Never add additional context or explanations.\n"
-
-OPENAI_EVAL_PROMPT = "You are an expert bilingual reviewer (English ↔ {language}). " \
-                     "You will be given:\n" \
-                     "Source text (English), Translation A, Translation B.\n" \
-                     "Select the translation that is *more accurate, natural, and faithful* to the source, " \
-                     "while preserving placeholders, HTML tags, and punctuation.\n" \
-                     "Your response MUST contain *only* the chosen translation string. " \
-                     "DO NOT include labels like 'Translation A:' or any other commentary.\n" \
-                     "If both are equally good, return Translation A.\n"
 
 def get_language_files(languages: list[str] = None) -> dict[str, pathlib.Path]:
   files = {}
@@ -73,51 +41,13 @@ def get_language_files(languages: list[str] = None) -> dict[str, pathlib.Path]:
   return files
 
 
-def evaluate_translation(source: str, old: str, new: str, language: str) -> str:
-  response = requests.post(
-    "https://api.openai.com/v1/chat/completions",
-    json={
-      "model": OPENAI_MODEL,
-      "messages": [
-        {
-          "role": "system",
-          "content": OPENAI_EVAL_PROMPT.format(language=language),
-        },
-        {
-          "role": "user",
-          "content": (
-            f"Source: {source}\n\n"
-            f"Translation A: {old}\n\n"
-            f"Translation B: {new}"
-          ),
-        },
-      ],
-      "temperature": 0.0,
-      "max_tokens": 1024,
-      "top_p": 1,
-    },
-    headers={
-      "Authorization": f"Bearer {OPENAI_API_KEY}",
-      "Content-Type": "application/json",
-    },
+def compare_translations(source: str, old_translation: str, new_translation: str, language: str) -> str:
+  prompt = (
+    f"You are a professional translator and quality assessor. For the source text: '{source}', "
+    f"you have two candidate translations for the GUI of openpilot. Candidate 1: '{old_translation}'. "
+    f"Candidate 2: '{new_translation}'. Evaluate which candidate better captures the intended meaning, tone, "
+    f"and context. Return only the text of the selected translation without any labels, prefixes, or additional commentary."
   )
-
-  if 400 <= response.status_code < 600:
-    raise requests.HTTPError(f'Error {response.status_code}: {response.json()}', response=response)
-
-  data = response.json()
-
-  return cast(str, data["choices"][0]["message"]["content"])
-
-
-def translate_phrase(text: str, language: str) -> str:
-  theme_instructions = FUN_THEME_INSTRUCTIONS.get(language.lower())
-
-  prompt = ""
-  if theme_instructions:
-    prompt = BASE_FUN_PROMPT_TEMPLATE.format(theme_instructions=theme_instructions)
-  else:
-    prompt = OPENAI_PROMPT.format(language=language)
 
   response = requests.post(
     "https://api.openai.com/v1/chat/completions",
@@ -128,12 +58,47 @@ def translate_phrase(text: str, language: str) -> str:
           "role": "system",
           "content": prompt,
         },
+      ],
+      "temperature": 0.8,
+      "max_tokens": 1024,
+      "top_p": 1,
+    },
+    headers={
+      "Authorization": f"Bearer {OPENAI_API_KEY}",
+      "Content-Type": "application/json",
+    },
+  )
+
+  if 400 <= response.status_code < 600:
+    print(f'Error comparing translations {response.status_code}: {response.text}')
+    return new_translation
+
+  data = response.json()
+
+  return cast(str, data["choices"][0]["message"]["content"])
+
+
+def translate_phrase(text: str, language: str) -> str:
+  system_prompt = OPENAI_PROMPT.format(language=language)
+  if language in FUN_LANGUAGES:
+    fun_prompt = FUN_PROMPT.format(language=language)
+    system_prompt += "\n\n" + fun_prompt
+
+  response = requests.post(
+    "https://api.openai.com/v1/chat/completions",
+    json={
+      "model": OPENAI_MODEL,
+      "messages": [
+        {
+          "role": "system",
+          "content": system_prompt,
+        },
         {
           "role": "user",
           "content": text,
         },
       ],
-      "temperature": 0.1,
+      "temperature": 0.8,
       "max_tokens": 1024,
       "top_p": 1,
     },
@@ -152,7 +117,7 @@ def translate_phrase(text: str, language: str) -> str:
   return cast(str, data["choices"][0]["message"]["content"])
 
 
-def translate_file(path: pathlib.Path, language: str, all_: bool, vet_translations: bool) -> None:
+def translate_file(path: pathlib.Path, language: str, all_: bool, vet_translations: bool = False) -> None:
   tree = ET.parse(path)
 
   root = tree.getroot()
@@ -171,42 +136,55 @@ def translate_file(path: pathlib.Path, language: str, all_: bool, vet_translatio
       if source is None or translation is None:
         raise ValueError("source or translation not found")
 
-      translation_type = translation.attrib.get("type", "")
-
+      current_type = translation.attrib.get("type", "")
       if vet_translations:
-        if "-generated" not in translation_type:
+        if not all_ and current_type == "":
           continue
-      elif not all_:
-        if translation_type != "unfinished":
-          if translation_type.endswith("-generated") and not translation_type.startswith(OPENAI_MODEL):
-            pass
+
+        new_translation = translate_phrase(cast(str, source.text), language)
+
+        if not new_translation.strip():
+          print(f"Skipping empty translation for: {source.text}")
+          continue
+
+        if current_type == f"{OPENAI_MODEL}-generated":
+          if translation.text and translation.text.strip():
+            final_translation = compare_translations(cast(str, source.text), cast(str, translation.text), new_translation, language)
           else:
-            continue
-
-      text = cast(str, source.text)
-      llm_translation = translate_phrase(text, language)
-
-      print(f"Source: {text}\n" +
-            f"Current translation: {translation.text}\n" +
-            f"LLM translation: {llm_translation}")
-
-      if vet_translations:
-        old_translation = translation.text or ""
-        print(f"Comparison:\n" +
-              f"Current translation: {old_translation}\n" +
-              f"New translation: {llm_translation}")
-
-        best = evaluate_translation(text, old_translation, llm_translation, language)
-        print(f"Chosen translation: {best}")
-        translation.text = best
+            final_translation = new_translation
+        else:
+          final_translation = new_translation
       else:
+        if not all_ and current_type in ("", f"{OPENAI_MODEL}-generated"):
+          continue
+
+        llm_translation = translate_phrase(cast(str, source.text), language)
+
+        if not llm_translation.strip():
+          print(f"Skipping empty translation for: {source.text}")
+          continue
+
+        final_translation = llm_translation
+
+      print(f"Source: {source.text}\n" +
+            f"Current translation: {translation.text}\n" +
+            f"Final translation: {final_translation}")
+
+      if "%n" in cast(str, source.text):
+        translation.text = None
+        plural_elem = ET.Element("numerusform")
+        plural_elem.text = final_translation.strip()
+        translation.clear()
+        translation.append(plural_elem)
+      else:
+        translation.text = final_translation.strip()
         translation.set("type", f"{OPENAI_MODEL}-generated")
-        translation.text = llm_translation
 
   with path.open("w", encoding="utf-8") as fp:
     fp.write('<?xml version="1.0" encoding="utf-8"?>\n' +
              '<!DOCTYPE TS>\n' +
-             ET.tostring(root, encoding="utf-8").decode())
+             ET.tostring(root, encoding="utf-8", short_empty_elements=False).decode() +
+             "\n")
 
 
 def main():
@@ -217,7 +195,7 @@ def main():
   group.add_argument("-f", "--file", nargs="+", help="Translate the selected files. (Example: -f fr de)")
 
   arg_parser.add_argument("-t", "--all-translations", action="store_true", default=False, help="Translate all sections. (Default: only unfinished)")
-  arg_parser.add_argument("-v", "--vet-translations", action="store_true", default=False, help="Re-evaluate AI-generated translations")
+  arg_parser.add_argument("--vet-translations", action="store_true", default=False, help="Re-evaluate AI-generated translations")
 
   args = arg_parser.parse_args()
 
@@ -234,14 +212,15 @@ def main():
       print(f"No language files found: {missing_files}")
       exit(1)
 
-  if args.vet_translations:
+  vet_translations = args.vet_translations
+  if vet_translations:
     print(f"Re-evaluating all translations with the '{OPENAI_MODEL}-generated' type.")
   else:
     print(f"Translation mode: {'all' if args.all_translations else 'only unfinished'}. Files: {list(files)}")
 
   for lang, path in files.items():
     print(f"Translate {lang} ({path})")
-    translate_file(path, lang, args.all_translations, args.vet_translations)
+    translate_file(path, lang, args.all_translations, vet_translations)
 
 
 if __name__ == "__main__":

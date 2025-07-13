@@ -18,8 +18,8 @@ from openpilot.system.athena.registration import register, UNREGISTERED_DONGLE_I
 from openpilot.common.swaglog import cloudlog, add_file_handler
 from openpilot.system.version import get_build_metadata, terms_version, training_version
 
-from openpilot.frogpilot.common.frogpilot_functions import convert_params, frogpilot_boot_functions, setup_frogpilot, uninstall_frogpilot
-from openpilot.frogpilot.common.frogpilot_variables import frogpilot_default_params, get_frogpilot_toggles, params_cache, params_memory
+from openpilot.selfdrive.frogpilot.frogpilot_functions import convert_params, frogpilot_boot_functions, setup_frogpilot, uninstall_frogpilot
+from openpilot.selfdrive.frogpilot.frogpilot_variables import frogpilot_default_params, get_frogpilot_toggles, params_memory
 
 
 def manager_init() -> None:
@@ -36,6 +36,7 @@ def manager_init() -> None:
 
   # FrogPilot variables
   setup_frogpilot(build_metadata)
+  params_cache = Params("/cache/params")
   convert_params(params_cache)
 
   default_params: list[tuple[str, str | bytes]] = [
@@ -55,18 +56,16 @@ def manager_init() -> None:
 
   # set unset params
   reset_toggles = params.get_bool("DoToggleReset")
-  reset_toggles_stock = params.get_bool("DoToggleResetStock")
-  for k, v in default_params + [(k, v) for k, v, _, stock in frogpilot_default_params]:
-    if params.get(k) is None or reset_toggles or reset_toggles_stock:
-      if params_cache.get(k) is None or reset_toggles or reset_toggles_stock:
-        params.put(k, v if not reset_toggles_stock else stock)
+  for k, v in default_params + [(k, v) for k, v, _ in frogpilot_default_params]:
+    if params.get(k) is None or reset_toggles:
+      if params_cache.get(k) is None or reset_toggles:
+        params.put(k, v)
         params_cache.remove(k)
       else:
         params.put(k, params_cache.get(k))
     else:
       params_cache.put(k, params.get(k))
   params.remove("DoToggleReset")
-  params.remove("DoToggleResetStock")
 
   frogpilot_boot_functions(build_metadata, params_cache)
 
@@ -206,7 +205,7 @@ def manager_thread() -> None:
     if shutdown:
       break
 
-    # Update FrogPilot variables
+    # Update FrogPilot parameters
     if sm['frogpilotPlan'].togglesUpdated:
       frogpilot_toggles = get_frogpilot_toggles()
 

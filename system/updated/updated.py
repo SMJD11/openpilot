@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import gc
 import os
 import re
 import datetime
@@ -23,7 +22,7 @@ from openpilot.selfdrive.controls.lib.alertmanager import set_offroad_alert
 from openpilot.system.hardware import AGNOS, HARDWARE
 from openpilot.system.version import get_build_metadata
 
-from openpilot.frogpilot.common.frogpilot_variables import BACKUP_PATH, get_frogpilot_toggles, params_memory
+from openpilot.selfdrive.frogpilot.frogpilot_variables import get_frogpilot_toggles, params_memory
 
 LOCK_FILE = os.getenv("UPDATER_LOCK_FILE", "/tmp/safe_staging_overlay.lock")
 STAGING_ROOT = os.getenv("UPDATER_STAGING_ROOT", "/data/safe_staging")
@@ -60,9 +59,7 @@ class WaitTimeHelper:
     self.user_request = UserRequest.CHECK
     self.ready_event.set()
 
-  def sleep(self, t: float, has_internet: bool = False) -> None:
-    if not has_internet:
-      gc.collect()
+  def sleep(self, t: float) -> None:
     self.ready_event.wait(timeout=t)
 
 def write_time_to_param(params, param) -> None:
@@ -212,9 +209,6 @@ def finalize_update(manual_update_requested, params, frogpilot_toggles) -> None:
     cloudlog.event("Done git cleanup", duration=time.monotonic() - t)
   except subprocess.CalledProcessError:
     cloudlog.exception(f"Failed git cleanup, took {time.monotonic() - t:.3f} s")
-
-  if os.path.isfile(BACKUP_PATH):
-    os.remove(BACKUP_PATH)
 
   set_consistent_flag(True)
   cloudlog.info("done finalizing overlay")
@@ -464,8 +458,6 @@ def main() -> None:
     while True:
       wait_helper.ready_event.clear()
 
-      frogpilot_toggles = get_frogpilot_toggles()
-
       manual_update_requested = params_memory.get_bool("ManualUpdateInitiated")
       params_memory.remove("ManualUpdateInitiated")
 
@@ -488,6 +480,10 @@ def main() -> None:
           params.put("InstallDate", datetime.datetime.now().astimezone(ZoneInfo('America/Phoenix')).strftime("%B %d, %Y - %I:%M%p").encode('utf8'))
           install_date_set = True
 
+        if not (frogpilot_toggles.automatic_updates or manual_update_requested):
+          wait_helper.sleep(60*60*24*365*100)
+          continue
+
         update_failed_count += 1
 
         # check for update
@@ -498,14 +494,13 @@ def main() -> None:
         last_fetch = read_time_from_param(params, "UpdaterLastFetchTime")
         timed_out = last_fetch is None or (datetime.datetime.utcnow() - last_fetch > datetime.timedelta(days=3))
         user_requested_fetch = wait_helper.user_request == UserRequest.FETCH
-        if manual_update_requested or frogpilot_toggles.automatic_updates:
-          if params.get_bool("NetworkMetered") and not timed_out and not user_requested_fetch:
-            cloudlog.info("skipping fetch, connection metered")
-          elif wait_helper.user_request == UserRequest.CHECK:
-            cloudlog.info("skipping fetch, only checking")
-          else:
-            updater.fetch_update(manual_update_requested, frogpilot_toggles)
-            write_time_to_param(params, "UpdaterLastFetchTime")
+        if params.get_bool("NetworkMetered") and not timed_out and not user_requested_fetch:
+          cloudlog.info("skipping fetch, connection metered")
+        elif wait_helper.user_request == UserRequest.CHECK:
+          cloudlog.info("skipping fetch, only checking")
+        else:
+          updater.fetch_update(manual_update_requested, frogpilot_toggles)
+          write_time_to_param(params, "UpdaterLastFetchTime")
         update_failed_count = 0
       except subprocess.CalledProcessError as e:
         cloudlog.event(
@@ -530,7 +525,7 @@ def main() -> None:
 
       # infrequent attempts if we successfully updated recently
       wait_helper.user_request = UserRequest.NONE
-      wait_helper.sleep(5*60 if update_failed_count > 0 and updater.has_internet else 1.5*60*60, updater.has_internet)
+      wait_helper.sleep(5*60 if update_failed_count > 0 else 1.5*60*60)
 
 
 if __name__ == "__main__":

@@ -19,7 +19,6 @@ function agnos_init {
   # udev does this, but sometimes we startup faster
   sudo chgrp gpu /dev/adsprpc-smd /dev/ion /dev/kgsl-3d0
   sudo chmod 660 /dev/adsprpc-smd /dev/ion /dev/kgsl-3d0
-  sudo chmod 0777 /cache
 
   # Check if AGNOS update is required
   if [ $(< /VERSION) != "$AGNOS_VERSION" ]; then

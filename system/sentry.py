@@ -1,6 +1,4 @@
 """Install exception handler for process crash."""
-import os
-import psutil
 import sentry_sdk
 import traceback
 from datetime import datetime
@@ -13,13 +11,13 @@ from openpilot.system.hardware import HARDWARE, PC
 from openpilot.common.swaglog import cloudlog
 from openpilot.system.version import get_build_metadata, get_version
 
-from openpilot.frogpilot.common.frogpilot_variables import ERROR_LOGS_PATH, params
+from openpilot.selfdrive.frogpilot.frogpilot_variables import ERROR_LOGS_PATH
 
 class SentryProject(Enum):
   # python project
-  SELFDRIVE = os.environ.get("SENTRY_DSN", "")
+  SELFDRIVE = "https://0c2fea9f108f30f51d26ee7d259580ea@o4505034923769856.ingest.us.sentry.io/4505034930651136"
   # native project
-  SELFDRIVE_NATIVE = os.environ.get("SENTRY_DSN", "")
+  SELFDRIVE_NATIVE = "https://0c2fea9f108f30f51d26ee7d259580ea@o4505034923769856.ingest.us.sentry.io/4505034930651136"
 
 
 def report_tombstone(fn: str, message: str, contents: str) -> None:
@@ -37,7 +35,7 @@ def capture_exception(*args, **kwargs) -> None:
 
   phrases_to_check = [
     "already exists. To overwrite it, set 'overwrite' to True",
-    "failed after retry",
+    "setup_quectel failed after retry",
   ]
 
   if any(phrase in exc_text for phrase in phrases_to_check):
@@ -51,47 +49,6 @@ def capture_exception(*args, **kwargs) -> None:
     sentry_sdk.flush()  # https://github.com/getsentry/sentry-python/issues/291
   except Exception:
     cloudlog.exception("sentry exception")
-
-
-def capture_memory_log():
-  virtual_memory = psutil.virtual_memory()
-  total_used = virtual_memory.used
-  total_memory = virtual_memory.total
-
-  process_list = []
-  for process in psutil.process_iter(['pid', 'username', 'memory_percent', 'cmdline', 'name']):
-    try:
-      cmdline = process.info.get('cmdline')
-      memory_percent = process.info.get('memory_percent', 0)
-
-      if cmdline and len(cmdline) > 0:
-        command = " ".join(cmdline)
-      else:
-        command = process.info.get('name', '')
-
-      process_list.append({
-        "pid": process.info['pid'],
-        "user": process.info.get('username', ''),
-        "memory_usage_percent": memory_percent,
-        "command": command
-      })
-    except (psutil.NoSuchProcess, psutil.AccessDenied):
-      continue
-
-  process_list.sort(key=lambda process: process['memory_usage_percent'], reverse=True)
-  top_processes = process_list[:5]
-
-  message = (
-    f"High memory detected: "
-    f"{(total_used / total_memory) * 100:.2f}% of total."
-  )
-
-  with sentry_sdk.push_scope() as scope:
-    scope.set_extra("total_memory_usage_percent", (total_used / total_memory) * 100)
-    scope.set_extra("top_processes", top_processes)
-    scope.set_extra("updater_state", params.get("UpdaterState", encoding="utf-8"))
-    sentry_sdk.capture_message(message, level="fatal")
-    sentry_sdk.flush()
 
 
 def capture_report(discord_user, report, frogpilot_toggles):
@@ -114,7 +71,7 @@ def set_tag(key: str, value: str) -> None:
 
 def save_exception(exc_text: str) -> None:
   files = [
-    ERROR_LOGS_PATH / datetime.now().astimezone().strftime("%Y-%m-%d--%H-%M-%S.log"),
+    ERROR_LOGS_PATH / datetime.now().strftime("%Y-%m-%d--%H-%M-%S.log"),
     ERROR_LOGS_PATH / "error.txt"
   ]
 
@@ -136,14 +93,10 @@ def init(project: SentryProject) -> bool:
 
   short_branch = build_metadata.channel
 
-  if short_branch == "COMMA":
-    return
-  elif short_branch == "FrogPilot-Development":
+  if short_branch == "FrogPilot-Development":
     env = "Development"
   elif build_metadata.release_channel:
     env = "Release"
-  elif short_branch == "FrogPilot-Testing":
-    env = "Testing"
   elif build_metadata.tested_channel:
     env = "Staging"
   else:

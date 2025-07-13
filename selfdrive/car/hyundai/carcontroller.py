@@ -9,9 +9,8 @@ from openpilot.selfdrive.car.hyundai.hyundaicanfd import CanBus
 from openpilot.selfdrive.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR
 from openpilot.selfdrive.car.interfaces import CarControllerBase
 
-from openpilot.frogpilot.controls.lib.frogpilot_acceleration import get_max_allowed_accel
+from openpilot.selfdrive.frogpilot.controls.lib.frogpilot_acceleration import get_max_allowed_accel
 
-GearShifter = car.CarState.GearShifter
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 LongCtrlState = car.CarControl.Actuators.LongControlState
 
@@ -47,7 +46,7 @@ def process_hud_alert(enabled, fingerprint, hud_control):
 
 
 class CarController(CarControllerBase):
-  def __init__(self, dbc_name, CP, FPCP, VM):
+  def __init__(self, dbc_name, CP, VM):
     self.CP = CP
     self.CAN = CanBus(CP)
     self.params = CarControllerParams(CP)
@@ -65,10 +64,8 @@ class CarController(CarControllerBase):
     hud_control = CC.hudControl
 
     # steering torque
-    self.params = CarControllerParams(self.CP, CS.out.vEgoRaw, frogpilot_toggles)
     new_steer = int(round(actuators.steer * self.params.STEER_MAX))
     apply_steer = apply_driver_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.params)
-    apply_steer = clip(apply_steer, -self.params.STEER_MAX, self.params.STEER_MAX)
 
     # >90 degree steering fault prevention
     self.angle_limit_counter, apply_steer_req = common_fault_avoidance(abs(CS.out.steeringAngleDeg) >= MAX_ANGLE, CC.latActive,
@@ -84,7 +81,7 @@ class CarController(CarControllerBase):
     self.apply_steer_last = apply_steer
 
     # accel + longitudinal
-    if frogpilot_toggles.sport_plus and (CS.out.gearShifter == GearShifter.sport or not frogpilot_toggles.map_acceleration):
+    if frogpilot_toggles.sport_plus:
       accel = clip(actuators.accel, CarControllerParams.ACCEL_MIN, min(frogpilot_toggles.max_desired_acceleration, get_max_allowed_accel(CS.out.vEgo)))
     else:
       accel = clip(actuators.accel, CarControllerParams.ACCEL_MIN, min(frogpilot_toggles.max_desired_acceleration, CarControllerParams.ACCEL_MAX))

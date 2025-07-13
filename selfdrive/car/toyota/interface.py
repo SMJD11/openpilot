@@ -7,6 +7,8 @@ from openpilot.selfdrive.car import create_button_events, get_safety_config
 from openpilot.selfdrive.car.disable_ecu import disable_ecu
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase
 
+from openpilot.selfdrive.frogpilot.frogpilot_variables import params
+
 ButtonType = car.CarState.ButtonEvent.Type
 FrogPilotButtonType = custom.FrogPilotCarState.ButtonEvent.Type
 EventName = car.CarEvent.EventName
@@ -18,7 +20,7 @@ class CarInterface(CarInterfaceBase):
     return CarControllerParams(CP).ACCEL_MIN, CarControllerParams(CP).ACCEL_MAX
 
   @staticmethod
-  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs, frogpilot_toggles):
+  def _get_params(ret, candidate, fingerprint, car_fw, disable_openpilot_long, experimental_long, docs):
     ret.carName = "toyota"
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.toyota)]
     ret.safetyConfigs[0].safetyParam = EPS_SCALE[candidate]
@@ -68,6 +70,9 @@ class CarInterface(CarInterfaceBase):
         if fw.ecu == "eps" and not fw.fwVersion == b'8965B47060\x00\x00\x00\x00\x00\x00':
           ret.steerActuatorDelay = 0.25
           CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning, steering_angle_deadzone_deg=0.2)
+
+      if 0x23 in fingerprint[0]:  # Detect if ZSS is present
+        ret.flags |= ToyotaFlags.ZSS.value
 
     elif candidate in (CAR.LEXUS_RX, CAR.LEXUS_RX_TSS2):
       ret.wheelSpeedFactor = 1.035
@@ -121,8 +126,11 @@ class CarInterface(CarInterfaceBase):
     #  - TSS2 radar ACC cars w/o smartDSU installed (disables radar)
     #  - TSS-P DSU-less cars w/ CAN filter installed (no radar parser yet)
 
-    ret.openpilotLongitudinalControl = use_sdsu or ret.enableDsu or candidate in (TSS2_CAR - RADAR_ACC_CAR) or bool(ret.flags & ToyotaFlags.DISABLE_RADAR.value)
-    ret.openpilotLongitudinalControl &= not frogpilot_toggles.disable_openpilot_long
+    if ret.flags & ToyotaFlags.SECOC.value:
+      ret.openpilotLongitudinalControl = False
+    else:
+      ret.openpilotLongitudinalControl = use_sdsu or ret.enableDsu or candidate in (TSS2_CAR - RADAR_ACC_CAR) or bool(ret.flags & ToyotaFlags.DISABLE_RADAR.value)
+    ret.openpilotLongitudinalControl &= not disable_openpilot_long
 
     ret.autoResumeSng = ret.openpilotLongitudinalControl and candidate in NO_STOP_TIMER_CAR
     ret.enableGasInterceptor = 0x201 in fingerprint[0] and ret.openpilotLongitudinalControl
@@ -165,7 +173,7 @@ class CarInterface(CarInterfaceBase):
         *create_button_events(self.CS.cruise_decreased, self.CS.cruise_decreased_previously, {1: ButtonType.decelCruise}),
         *create_button_events(self.CS.cruise_increased, self.CS.cruise_increased_previously, {1: ButtonType.accelCruise}),
         *create_button_events(self.CS.distance_button, self.CS.prev_distance_button, {1: ButtonType.gapAdjustCruise}),
-        *create_button_events(self.CS.lkas_enabled, self.CS.lkas_previously_enabled, {1: FrogPilotButtonType.lkas}),
+        *create_button_events(self.CS.lkas_enabled != self.CS.lkas_previously_enabled, False, {1: FrogPilotButtonType.lkas}),
       ]
 
     # events
