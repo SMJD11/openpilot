@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # PFEIFER - MAPD - Modified by FrogAi for FrogPilot
-import json
+# CONFIGURED FOR CUSTOM MAPD WITH HARDCODED VERSION
 import os
 import shutil
 import stat
@@ -13,91 +13,101 @@ from pathlib import Path
 from openpilot.frogpilot.common.frogpilot_utilities import is_url_pingable
 from openpilot.frogpilot.common.frogpilot_variables import MAPD_PATH, params_memory
 
-VERSION = "v2"
+# ==============================================================================
+# ---                           CONFIGURATION                            ---
+# ---    YOU ONLY NEED TO EDIT THE VARIABLES IN THIS SECTION             ---
+# ==============================================================================
 
-GITHUB_VERSION_URL = f"https://github.com/FrogAi/FrogPilot-Resources/raw/Versions/mapd_version_{VERSION}.json"
-GITLAB_VERSION_URL = f"https://gitlab.com/FrogAi/FrogPilot-Resources/-/raw/Versions/mapd_version_{VERSION}.json"
+# 1. Your GitHub username.
+GITHUB_USER = "SMJD11"
 
+# 2. The name of your 'mapd' code repository.
+MAPD_REPO = "mapd"
+
+# 3. The EXACT tag of the GitHub Release you want to use.
+#    This is the version of the mapd binary that will always be used.
+#    Example: "v1.11.0"
+MAPD_VERSION = "v1.2.1-stop-sign"
+
+# ==============================================================================
+# ---                         END OF CONFIGURATION                         ---
+# ==============================================================================
+
+
+# Local path to store the version info on the device. This lets the script
+# know which version is currently installed.
 VERSION_PATH = Path("/data/media/0/osm/mapd_version")
 
 def download():
+  """
+  Downloads the specified mapd binary from YOUR GitHub releases.
+  """
   Path(MAPD_PATH).parent.mkdir(parents=True, exist_ok=True)
 
-  while not (is_url_pingable("https://github.com") or is_url_pingable("https://gitlab.com")):
+  # Wait for an internet connection
+  while not is_url_pingable("https://github.com"):
     time.sleep(60)
 
-  latest_version = get_latest_version()
+  # Construct the URL pointing to your specific mapd release asset.
+  url = f"https://github.com/{GITHUB_USER}/{MAPD_REPO}/releases/download/{MAPD_VERSION}/mapd"
 
-  urls = [
-    f"https://github.com/pfeiferj/openpilot-mapd/releases/download/{latest_version}/mapd",
-    f"https://gitlab.com/FrogAi/FrogPilot-Resources/-/raw/Mapd/{latest_version}"
-  ]
+  try:
+    print(f"Downloading your specified mapd version {MAPD_VERSION}...")
+    with urllib.request.urlopen(url) as response:
+      with open(MAPD_PATH, "wb") as mapd_file:
+        shutil.copyfileobj(response, mapd_file)
+        os.fsync(mapd_file.fileno())
+        # Make the downloaded file executable
+        os.chmod(MAPD_PATH, os.stat(MAPD_PATH).st_mode | stat.S_IEXEC)
 
-  for url in urls:
-    try:
-      with urllib.request.urlopen(url) as response:
-        with open(MAPD_PATH, "wb") as mapd:
-          shutil.copyfileobj(response, mapd)
+    # Write the hardcoded version to the local version file to confirm it's installed.
+    with open(VERSION_PATH, "w") as version_file:
+      version_file.write(MAPD_VERSION)
+      os.fsync(version_file.fileno())
 
-          os.fsync(mapd.fileno())
-          os.chmod(MAPD_PATH, os.stat(MAPD_PATH).st_mode | stat.S_IEXEC)
-      with open(VERSION_PATH, "w") as version_file:
-        version_file.write(latest_version)
+    print(f"Successfully downloaded and installed mapd version {MAPD_VERSION}.")
 
-        os.fsync(version_file.fileno())
-      return
-    except Exception as error:
-      print(f"Failed to download mapd from {url}: {error}")
-
-def get_latest_version():
-  while not (is_url_pingable("https://github.com") or is_url_pingable("https://gitlab.com")):
-    time.sleep(60)
-
-  for url in [GITHUB_VERSION_URL, GITLAB_VERSION_URL]:
-    try:
-      with urllib.request.urlopen(url, timeout=10) as response:
-        return json.loads(response.read().decode("utf-8"))["version"]
-    except Exception as error:
-      print(f"Error fetching mapd version from {url}: {error}")
-  return "v0"
+  except Exception as error:
+    print(f"Failed to download mapd from {url}: {error}")
+    # If the download fails, delete the version file to force a retry on the next loop
+    if VERSION_PATH.exists():
+        VERSION_PATH.unlink()
 
 def mapd_thread():
+  """
+  The main thread that manages the mapd lifecycle.
+  """
   while True:
-    if not MAPD_PATH.exists():
-      print(f"{MAPD_PATH} not found. Downloading...")
-      download()
-      continue
+    try:
+      # Check if the correct version is installed
+      is_correct_version_installed = False
+      if MAPD_PATH.exists() and VERSION_PATH.exists():
+        with open(VERSION_PATH) as version_file:
+          if version_file.read().strip() == MAPD_VERSION:
+            is_correct_version_installed = True
 
-    if not VERSION_PATH.exists():
-      print(f"{VERSION_PATH} not found. Downloading mapd...")
-      download()
-      continue
-
-    with open(VERSION_PATH) as version_file:
-      if is_url_pingable("https://github.com") or is_url_pingable("https://gitlab.com"):
-        if version_file.read().strip() != get_latest_version():
-          print("New mapd version available. Updating...")
-          download()
-          continue
-
-    if not os.access(MAPD_PATH, os.X_OK):
-      print(f"{MAPD_PATH} is not executable. Fixing permissions...")
-      try:
-        os.chmod(MAPD_PATH, os.stat(MAPD_PATH).st_mode | stat.S_IEXEC)
-      except Exception as e:
-        print(f"Failed to set executable permissions on {MAPD_PATH}: {e}")
+      # If the correct version isn't installed, download it.
+      if not is_correct_version_installed:
+        print(f"Correct mapd version ({MAPD_VERSION}) not found. Downloading...")
+        download()
         continue
 
-    try:
+      # Ensure the binary is executable
+      if not os.access(MAPD_PATH, os.X_OK):
+        print(f"{MAPD_PATH} is not executable. Fixing permissions...")
+        os.chmod(MAPD_PATH, os.stat(MAPD_PATH).st_mode | stat.S_IEXEC)
+
+      # Run the mapd binary
       process = subprocess.Popen(str(MAPD_PATH))
-      process.wait()
-    except FileNotFoundError as e:
-      print(f"Subprocess failed: {e}")
-      download()
+      process.wait() # Wait for the process to exit (e.g., if it crashes)
+
+    except Exception as e:
+      print(f"An error occurred in mapd_thread: {e}")
+      # If something goes wrong, wait a bit before retrying
+      time.sleep(30)
 
 def main():
-  params_memory.put("MapdLogLevel", "disabled")
-
+  params_memory.put("MapdLogLevel", "info") # Set a default log level
   mapd_thread()
 
 if __name__ == "__main__":

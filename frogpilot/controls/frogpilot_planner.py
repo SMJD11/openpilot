@@ -41,6 +41,7 @@ class FrogPilotPlanner:
     self.model_length = 0
     self.road_curvature = 0
     self.v_cruise = 0
+    self.distance_to_stop_sign = 0
 
   def update(self, sm, frogpilot_toggles):
     self.lead_one = sm["radarState"].leadOne
@@ -102,7 +103,7 @@ class FrogPilotPlanner:
     self.tracking_lead = self.update_lead_status()
 
     self.v_cruise = self.frogpilot_vcruise.update(gps_position, v_cruise, v_ego, sm, frogpilot_toggles)
-
+    self.distance_to_stop_sign = self.frogpilot_vcruise.slc.distance_to_stop_sign
   def update_lead_status(self):
     following_lead = self.lead_one.status
     following_lead &= self.lead_one.dRel < self.model_length + STOP_DISTANCE
@@ -156,6 +157,12 @@ class FrogPilotPlanner:
     frogpilotPlan.slcSpeedLimitSource = self.frogpilot_vcruise.slc.source
     frogpilotPlan.speedLimitChanged = self.frogpilot_vcruise.slc.speed_limit_changed_timer > DT_MDL
     frogpilotPlan.unconfirmedSlcSpeedLimit = self.frogpilot_vcruise.slc.unconfirmed_speed_limit
+    # --- START NEW BLOCK ---
+    # Pass stop sign information to the plan
+    frogpilotPlan.upcomingStopSign = self.frogpilot_vcruise.slc.stop_sign_active
+    frogpilotPlan.distanceToStopSign = self.frogpilot_vcruise.slc.distance_to_stop_sign
+    # --- END OF NEW BLOCK ---
+
 
     frogpilotPlan.themeUpdated = theme_updated
 
