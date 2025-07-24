@@ -36,6 +36,10 @@ class SpeedLimitController:
     self.speed_limit_changed_timer = 0
     self.target = 0
     self.unconfirmed_speed_limit = 0
+    # --- ADD THESE NEW VARIABLES ---
+    self.upcoming_stop_sign = {}
+    self.stop_sign_alert = False
+    # --- END OF NEW VARIABLES ---
 
     self.previous_source = "None"
     self.source = "None"
@@ -229,6 +233,8 @@ class SpeedLimitController:
   def update_limits(self, dashboard_speed_limit, gps_position, navigation_speed_limit, v_cruise, v_cruise_cluster, v_ego, sm):
     self.update_map_speed_limit(gps_position, v_ego)
 
+    self._update_stop_sign_detection(gps_position, v_ego) #added for stop sign detection
+
     limits = {
       "Dashboard": dashboard_speed_limit,
       "Map Data": self.map_speed_limit,
@@ -337,3 +343,37 @@ class SpeedLimitController:
 
       if distance_to_upcoming < max_lookahead:
         self.map_speed_limit = self.next_speed_limit
+  def _update_stop_sign_detection(self, gps_position, v_ego):
+    """
+    Checks for upcoming stop signs from mapd and sets a flag if an alert is needed.
+    """
+    # Read the data from the new parameter
+    self.upcoming_stop_sign = json.loads(params_memory.get("NextMapStopSign") or "{}")
+    
+    # Check if we have a valid stop sign ahead and a valid GPS position
+    if self.upcoming_stop_sign and gps_position:
+      current_latitude = gps_position.get("latitude")
+      current_longitude = gps_position.get("longitude")
+      
+      stop_latitude = self.upcoming_stop_sign.get("latitude")
+      stop_longitude = self.upcoming_stop_sign.get("longitude")
+
+      if stop_latitude and stop_longitude:
+        # Calculate the distance to the stop sign
+        distance_to_stop = calculate_distance_to_point(
+          math.radians(current_latitude), math.radians(current_longitude),
+          math.radians(stop_latitude), math.radians(stop_longitude)
+        )
+
+        # The distance at which we want to start warning the user.
+        # This is based on time to arrival (v_ego * 5 seconds), with a minimum of 100m
+        # and a maximum of 300m. This is the logic we can tune.
+        warning_distance = np.clip(v_ego * 5.0, 100, 300)
+
+        # Set the alert flag if we are within the warning distance
+        self.stop_sign_alert = distance_to_stop < warning_distance
+        return
+
+    # If no stop sign or no GPS, ensure the alert is off
+    self.stop_sign_alert = False
+  # --- END OF NEW METHOD ---

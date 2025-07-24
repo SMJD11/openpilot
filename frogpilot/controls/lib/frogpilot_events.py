@@ -53,7 +53,10 @@ class FrogPilotEvents:
 
         self.random_event_playing = False
         self.random_event_timer = 0
-
+      
+      if self.frogpilot_planner.frogpilot_vcruse.slc.stop_sign_alert:
+        self.events.add(EventName.stopSign)
+        
     if self.frogpilot_planner.frogpilot_vcruise.forcing_stop:
       self.events.add(EventName.forcingStop)
 

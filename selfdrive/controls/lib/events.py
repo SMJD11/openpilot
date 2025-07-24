@@ -1115,6 +1115,15 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       AlertStatus.frogpilot, AlertSize.small,
       Priority.LOW, VisualAlert.none, AudibleAlert.prompt, 3.),
   },
+    # --- ADD THIS NEW BLOCK ---
+  EventName.stopSign: {
+      ET.PERMANENT: Alert(
+          "Stop Sign Ahead",
+          "",
+          AlertStatus.normal, AlertSize.small,
+          Priority.LOW, VisualAlert.none, AudibleAlert.chimeDing, 3.0),
+    },
+    # --- END OF NEW BLOCK ---
 
   EventName.thisIsFineSteerSaturated: {
     ET.WARNING: Alert(
