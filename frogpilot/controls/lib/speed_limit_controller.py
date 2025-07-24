@@ -24,12 +24,6 @@ class SpeedLimitController:
   def __init__(self):
     self.executor = ThreadPoolExecutor(max_workers=1)
 
-    # --- START OF NEW BLOCK ---
-    self.stop_sign_active = False
-    self.distance_to_stop_sign = 0.0
-    self.previous_stop_sign_location = None
-    # --- END OF NEW BLOCK ---
-
     self.calling_mapbox = False
     self.override_slc = False
 
@@ -191,50 +185,6 @@ class SpeedLimitController:
 
       self.mapbox_limit = 0
       self.segment_distance = v_ego
-    # --- START NEW FUNCTION ---
-  def update_stop_sign_logic(self, gps_position, sm):
-    # Reset the distance on each loop
-    self.distance_to_stop_sign = 0.0
-
-    # Load the next stop sign data from mapd
-    next_stop_sign = json.loads(params_memory.get("NextMapStopSign") or "{}")
-    stop_sign_lat = next_stop_sign.get("latitude")
-    stop_sign_lon = next_stop_sign.get("longitude")
-
-    # If there is a valid stop sign location from mapd and we have a GPS signal
-    if stop_sign_lat and stop_sign_lon and gps_position:
-      current_latitude = gps_position.get("latitude")
-      current_longitude = gps_position.get("longitude")
-
-      # Calculate the distance to the upcoming stop sign
-      distance = calculate_distance_to_point(
-        math.radians(current_latitude), math.radians(current_longitude),
-        math.radians(stop_sign_lat), math.radians(stop_sign_lon)
-      )
-      self.distance_to_stop_sign = float(distance)
-
-      # State machine for activating/deactivating stop sign logic
-      current_stop_sign_location = (stop_sign_lat, stop_sign_lon)
-
-      # If this is a new stop sign (different from the one we last handled), reset the active state
-      if current_stop_sign_location != self.previous_stop_sign_location:
-        self.stop_sign_active = False
-        self.previous_stop_sign_location = current_stop_sign_location
-
-      # If the driver presses the gas after being at a standstill, deactivate the stop sign logic
-      # This is the "escape hatch" to prevent getting stuck at a 0 speed limit.
-      if sm["carState"].gasPressed and sm["carState"].standstill:
-        self.stop_sign_active = False
-
-      # Activate stop sign logic if we are within 250 meters
-      if self.distance_to_stop_sign < 250:
-        self.stop_sign_active = True
-
-    # If no stop sign is detected by mapd, ensure our state is inactive
-    else:
-      self.stop_sign_active = False
-      self.previous_stop_sign_location = None
-  # --- END OF NEW FUNCTION ---
 
   def handle_limit_change(self, desired_source, desired_target, sm):
     self.speed_limit_changed_timer += DT_MDL
@@ -278,10 +228,6 @@ class SpeedLimitController:
 
   def update_limits(self, dashboard_speed_limit, gps_position, navigation_speed_limit, v_cruise, v_cruise_cluster, v_ego, sm):
     self.update_map_speed_limit(gps_position, v_ego)
-    # --- NEW LINE ---
-    # Handle stop sign logic before determining the speed limit target
-    self.update_stop_sign_logic(gps_position, sm)
-    # --- END OF NEW LINE ---
 
     limits = {
       "Dashboard": dashboard_speed_limit,
@@ -391,5 +337,3 @@ class SpeedLimitController:
 
       if distance_to_upcoming < max_lookahead:
         self.map_speed_limit = self.next_speed_limit
-
-    

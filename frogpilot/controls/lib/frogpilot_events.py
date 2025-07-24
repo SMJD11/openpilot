@@ -64,13 +64,7 @@ class FrogPilotEvents:
       self.stopped_for_light = self.frogpilot_planner.cem.stop_light_detected
     else:
       self.stopped_for_light = False
-    # --- START OF NEW BLOCK ---
-    # Upcoming Stop Sign Alert
-    if sm["frogpilotPlan"].upcomingStopSign and sm["frogpilotPlan"].distanceToStopSign > 0:
-      # Show the alert when we are within 150 meters (about 500 feet) of the stop sign
-      if sm["frogpilotPlan"].distanceToStopSign < 150:
-        self.events.add(EventName.stopSign)
-    # --- END OF NEW BLOCK ---
+
     if not self.holiday_theme_played and self.startup_seen and sm["controlsState"].alertText1 == "" and frogpilot_toggles.current_holiday_theme != "stock" and len(self.events) == 0:
       self.events.add(EventName.holidayActive)
 
