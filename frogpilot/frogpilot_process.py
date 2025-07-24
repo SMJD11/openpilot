@@ -85,7 +85,7 @@ def frogpilot_thread():
   pm = messaging.PubMaster(["frogpilotPlan"])
   sm = messaging.SubMaster(["carControl", "carState", "controlsState", "deviceState", "driverMonitoringState",
                             "liveLocationKalman", "managerState", "modelV2", "pandaStates", "radarState",
-                            "frogpilotCarState", "frogpilotNavigation"],
+                            "frogpilotCarState", "frogpilotNavigation", "frogpilotPlan"],
                             poll="modelV2", ignore_avg_freq=["radarState"])
 
   while True:
